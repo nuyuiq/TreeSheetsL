@@ -3,25 +3,28 @@
 
 // 声明
 class MainWindow;
+class MyLog;
+class Server;
+class Config;
+
 class QString;
 
+// 成员需使用非对象的简洁类型
 struct MyApp
 {
-    MainWindow*frame;
+    MainWindow *frame;
+    MyLog *log;
+    Server *server;
+    Config *cfg;
 
 
-
-
-    MyApp();
-    ~MyApp();
+    bool Init();
+    void Relese();
     //! 加载翻译文件
     void loadTranslation(const QString &filename);
-    QString GetDocPath(const QString &relpath);
-    QString GetDataPath(const QString &relpath);
-
 };
 
 //! 全局参考，快速引用
-extern MyApp*myApp;
+extern MyApp myApp;
 
 #endif // MYAPP_H

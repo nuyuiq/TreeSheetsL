@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -12,15 +12,26 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     myapp.cpp \
-    widget.cpp
+    widget.cpp \
+    tools.cpp \
+    mylog.cpp \
+    server.cpp \
+    config.cpp
 
 HEADERS += \
     mainwindow.h \
     myapp.h \
-    widget.h
+    widget.h \
+    symdef.h \
+    tools.h \
+    mylog.h \
+    server.h \
+    config.h
 
 FORMS += \
         mainwindow.ui
+
+DESTDIR = $$PWD/../app
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
