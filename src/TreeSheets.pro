@@ -16,7 +16,8 @@ SOURCES += \
     tools.cpp \
     mylog.cpp \
     server.cpp \
-    config.cpp
+    config.cpp \
+    dropdown.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -26,10 +27,10 @@ HEADERS += \
     tools.h \
     mylog.h \
     server.h \
-    config.h
+    config.h \
+    dropdown.h
 
-FORMS += \
-        mainwindow.ui
+FORMS +=
 
 DESTDIR = $$PWD/../app
 

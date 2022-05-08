@@ -64,7 +64,6 @@ bool MyApp::Init()
 
 
     frame = new MainWindow;
-    frame->show();
     return true;
 }
 

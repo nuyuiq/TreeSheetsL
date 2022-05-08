@@ -18,13 +18,13 @@ enum {
     A_PASTE,
     A_NEWGRID,
     A_UNDO,
-//    A_ABOUT,
-//    A_RUN,
-//    A_CLRVIEW,
-//    A_MARKDATA,
-//    A_MARKVIEWH,
-//    A_MARKVIEWV,
-//    A_MARKCODE,
+    A_ABOUT,
+    A_RUN,
+    A_CLRVIEW,
+    A_MARKDATA,
+    A_MARKVIEWH,
+    A_MARKVIEWV,
+    A_MARKCODE,
     A_IMAGE,
     A_EXPIMAGE,
     A_EXPXML,
@@ -66,12 +66,12 @@ enum {
     A_IMPTXTC,
     A_IMPTXTS,
     A_IMPTXTT,
-//    A_HELP,
-//    A_MARKVARD,
-//    A_MARKVARU,
-//    A_SHOWSBAR,
-//    A_SHOWTBAR,
-//    A_LEFTTABS,
+    A_HELP,
+    A_MARKVARD,
+    A_MARKVARU,
+    A_SHOWSBAR,
+    A_SHOWTBAR,
+    A_LEFTTABS,
 //    A_TRADSCROLL,
     A_HOME,
     A_END,
@@ -88,8 +88,8 @@ enum {
     A_ITALIC,
     A_TT,
     A_UNDERL,
-//    A_SEARCH,
-//    A_REPLACE,
+    A_SEARCH,
+    A_REPLACE,
     A_REPLACEONCE,
     A_REPLACEONCEJ,
     A_REPLACEALL,
@@ -98,9 +98,9 @@ enum {
     A_BROWSE,
     A_ENTERCELL,
     A_PROGRESSCELL, // see https://github.com/aardappel/treesheets/issues/139#issuecomment-544167524
-//    A_CELLCOLOR,
-//    A_TEXTCOLOR,
-//    A_BORDCOLOR,
+    A_CELLCOLOR,
+    A_TEXTCOLOR,
+    A_BORDCOLOR,
     A_INCSIZE,
     A_DECSIZE,
     A_INCWIDTH,
@@ -113,9 +113,9 @@ enum {
     A_COLCELL,
     A_SORT,
     A_SEARCHF,
-//    A_MAKEBAKS,
-//    A_TOTRAY,
-//    A_AUTOSAVE,
+    A_MAKEBAKS,
+    A_TOTRAY,
+    A_AUTOSAVE,
     A_FULLSCREEN,
     A_ZEN_MODE,
     A_SCALED,
@@ -152,7 +152,7 @@ enum {
     A_FILTERL,
     A_FILTERS,
     A_FILTEROFF,
-//    A_FASTRENDER,
+    A_FASTRENDER,
     A_EXPCSV,
     A_PASTESTYLE,
     A_PREVFILE,
@@ -160,8 +160,8 @@ enum {
     A_IMAGER,
     A_INCWIDTHNH,
     A_DECWIDTHNH,
-//    A_ZOOMSCR,
-//    A_ICONSET,
+    A_ZOOMSCR,
+    A_ICONSET,
     A_V_GS,
     A_V_BS,
     A_V_LS,
@@ -181,10 +181,10 @@ enum {
     A_OPENCELLCOLOR,
     A_OPENTEXTCOLOR,
     A_OPENBORDCOLOR,
-//    A_DDIMAGE,
-//    A_MINCLOSE,
-//    A_SINGLETRAY,
-//    A_CENTERED,
+    A_DDIMAGE,
+    A_MINCLOSE,
+    A_SINGLETRAY,
+    A_CENTERED,
     A_SORTD,
     A_STRIKET,
     A_FOLD,
@@ -193,26 +193,36 @@ enum {
     A_IMAGESCP,
     A_IMAGESCF,
     A_IMAGESCN,
-//    A_HELPI,
-//    A_HELP_OP_REF,
+    A_HELPI,
+    A_HELP_OP_REF,
     A_REDO,
-//    A_FSWATCH,
+    A_FSWATCH,
     A_DEFBGCOL,
-//    A_THINSELC,
+    A_THINSELC,
     A_COPYCT,
     A_MINISIZE,
     A_CUSTKEY,
-//    A_AUTOEXPORT,
+    A_AUTOEXPORT,
     A_NOP,
 //    A_TAGSET = 1000,  // and all values from here on
-//    A_SCRIPT = 2000,  // and all values from here on
+    A_SCRIPT = 2000,  // and all values from here on
 //    A_MAXACTION = 3000
 };
 
 struct CfgCache {
+    int roundness;
+    int customcolor;
     bool singletray;
-
-
+    bool minclose;
+    bool totray;
+    bool zoomscroll;
+    bool thinselc;
+    bool makebaks;
+    bool autosave;
+    bool fswatch;
+    bool autohtmlexport;
+    bool centered;
+    bool fastrender;
 
 };
 
@@ -229,5 +239,17 @@ public:
 private:
     QSettings*setting;
 };
+
+
+
+
+// 全局配置
+namespace _g {
+// 默认调色板
+extern uint celltextcolors[];
+extern const int celltextcolors_size;
+#define CUSTOMCOLORIDX 0
+
+}
 
 #endif // CONFIG_H
