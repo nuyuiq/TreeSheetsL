@@ -2,13 +2,14 @@
 #define CONFIG_H
 
 #include <QVariant>
+#include <QMap>
 
 class QSettings;
 class QString;
 
 
 enum {
-    A_NEW = 500,
+    A_NEW = 1,
     A_OPEN,
     A_CLOSE,
     A_SAVE,
@@ -204,12 +205,18 @@ enum {
     A_CUSTKEY,
     A_AUTOEXPORT,
     A_NOP,
+
+    A_FILEHIS0 = 500,
+    //...
+
 //    A_TAGSET = 1000,  // and all values from here on
     A_SCRIPT = 2000,  // and all values from here on
 //    A_MAXACTION = 3000
 };
 
 struct CfgCache {
+    QMap<QString, QString> menuShortcutMap;
+    QStringList scriptsInMenu;
     int roundness;
     int customcolor;
     bool singletray;
@@ -234,7 +241,8 @@ public:
     ~Config();
 
     QVariant read(const QString &key, const QVariant &def=QVariant()) const;
-
+    // 注意key的值，不要为空或含有模糊匹配字符 *
+    void write(const QString &key, const QVariant &value);
     void reset();
 private:
     QSettings*setting;

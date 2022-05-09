@@ -13,5 +13,23 @@
 // 配置文件
 #define CFG_FILEPATH "TreeSheets.ini"
 
+// 打开历史最大条目
+#define MAXCOUNT_HISTORY 9
+
+// 图标
+#define ICON_FILEPATH "/icon16.png"
+
+// 工具条/状态栏背景色
+#define TOOL_BGCOLOR0 "#E8ECF0"
+#define TOOL_BGCOLOR1 "#BCC7D8"
+
+// 工具条原始尺寸
+#define TOOL_SIZE0 18
+#define TOOL_SIZE1 22
+
+// 工具栏图标
+#define TOOL_ICON0 "images/webalys/toolbar"
+#define TOOL_ICON1 "images/nuvola/toolbar"
+
 #endif // SYMDEF
 

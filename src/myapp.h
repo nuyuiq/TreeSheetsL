@@ -6,6 +6,8 @@ class MainWindow;
 class MyLog;
 class Server;
 class Config;
+class FileHistory;
+class Cell;
 
 class QString;
 
@@ -16,10 +18,18 @@ struct MyApp
     MyLog *log;
     Server *server;
     Config *cfg;
+    FileHistory *fhistory;
 
 
     bool Init();
     void Relese();
+
+    //! 加载本地文件
+    QString LoadDB(const QString &filename, bool fromreload);
+
+    //! 初始化空文档
+    Cell *InitDB(int sizex, int sizey = 0);
+
     //! 加载翻译文件
     void loadTranslation(const QString &filename);
 };

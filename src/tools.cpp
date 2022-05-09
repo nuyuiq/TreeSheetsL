@@ -16,3 +16,18 @@ QString Tools::resolvePath(const QString &path, bool exist)
     if (exist && !QFileInfo::exists(sp)) sp.clear();
     return sp;
 }
+
+QString Tools::bakName(const QString &filename)
+{
+    return extName(filename, QStringLiteral(".bak"));
+}
+
+QString Tools::tmpName(const QString &filename)
+{
+    return extName(filename, QStringLiteral(".tmp"));
+}
+
+QString Tools::extName(const QString &filename, const QString &ext)
+{
+    return QFileInfo(filename).filePath() + ext;
+}

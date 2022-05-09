@@ -5,6 +5,7 @@
 #include "myapp.h"
 #include "config.h"
 #include "dropdown.h"
+#include "history.h"
 
 #include <QScrollArea>
 #include <QIcon>
@@ -18,15 +19,25 @@
 #include <QStatusBar>
 #include <QApplication>
 #include <QDesktopWidget>
+#include <QFileSystemWatcher>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    myApp.frame = this;
+    _tmp_shortcut = new QStringList;
     initUI();
+    DELPTR(_tmp_shortcut);
+    watcher = new QFileSystemWatcher(this);
+    connect(watcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::fileChanged);
+
+    blinkTimer = startTimer(400);
+    savechecker = startTimer(1000);
 }
 
 MainWindow::~MainWindow()
 {
-
+    killTimer(savechecker);
+    killTimer(blinkTimer);
 }
 
 Widget *MainWindow::createWidget(const QString &name, bool append)
@@ -35,7 +46,8 @@ Widget *MainWindow::createWidget(const QString &name, bool append)
     Q_ASSERT(scroll);
     Widget* widget = new Widget(scroll);
     Q_ASSERT(widget);
-
+    widget->setFocusPolicy(Qt::StrongFocus);
+    widget->setAttribute(Qt::WA_InputMethodEnabled, true);
     nb->insertTab(append? -1: 0, scroll, name);
     return widget;
 }
@@ -57,9 +69,14 @@ void MainWindow::actionActivated()
     qDebug() << "shortcut:" << kid;
 }
 
+void MainWindow::fileChanged(const QString &path)
+{
+    qDebug() << path;
+}
+
 void MainWindow::appendSubMenu(
         QMenu *menu, int tag, const QString &contents,
-        const QString &help, int status, QActionGroup *group)
+        const QString &help, bool general, int status, QActionGroup *group)
 {
     QString item = contents;
     QString key;
@@ -91,14 +108,43 @@ void MainWindow::appendSubMenu(
     }
     connect(m, SIGNAL(triggered(bool)), this, SLOT(actionActivated()));
     menu->addAction(m);
-    // menustrings.push_back(std::make_pair(item, key));
+    if (general) myApp.cfg->menuShortcutMap.insert(item, key);
+}
+
+void MainWindow::fileChangeWatch(const QString &file)
+{
+    watcher->addPath(file);
+}
+
+Widget *MainWindow::getTabByFileName(const QString &fn)
+{
+    for (int i = 0; i < nb->count(); i++)
+    {
+        auto sa = qobject_cast<QScrollArea*>(nb->widget(i));
+        Q_ASSERT(sa);
+        auto win = qobject_cast<Widget*>(sa->widget());
+        Q_ASSERT(win);
+        // TODO
+        if (win->fn() == fn)
+        {
+            nb->setCurrentIndex(i);
+            return win;
+        }
+    }
+    return nullptr;
 }
 
 void MainWindow::createShortcut(const QVariant &key, int kid)
 {
-    const QKeySequence &ks = key.type() == QVariant::Int?
+    const QKeySequence &ks = key.type() != QVariant::String?
                 QKeySequence(key.toInt()):
                 QKeySequence(key.toString());
+    if (Q_LIKELY(_tmp_shortcut))
+    {
+        auto k = ks.toString();
+        if (k.isEmpty() || _tmp_shortcut->contains(k)) return;
+        _tmp_shortcut->append(k);
+    }
     auto* shortcut = new QShortcut(ks, this, SLOT(actionActivated()));
     shortcut->setProperty("kid", kid);
 }
@@ -109,20 +155,20 @@ void MainWindow::initUI()
     QString imgspath = Tools::resolvePath(IMG_FILEPATH, true);
     if (!imgspath.isEmpty())
     {
-        setWindowIcon(QIcon(imgspath + "/icon16.png"));
+        setWindowIcon(QIcon(imgspath + ICON_FILEPATH));
     }
 
     // 托盘功能
     trayIcon = new QSystemTrayIcon(this);
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
             this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
-    trayIcon->setIcon(QIcon(imgspath + "/icon16.png"));
+    trayIcon->setIcon(QIcon(imgspath + ICON_FILEPATH));
 
-    bool mergetbar = myApp.cfg->read(QStringLiteral("showtbar"), false).toBool();
+    bool mergetbar = myApp.cfg->read(QStringLiteral("mergetbar"), true).toBool();
     bool showtbar = myApp.cfg->read(QStringLiteral("showtbar"), true).toBool();
-    bool showsbar = myApp.cfg->read(QStringLiteral("showtbar"), true).toBool();
-    bool lefttabs = myApp.cfg->read(QStringLiteral("showtbar"), true).toBool();
-    bool iconset = myApp.cfg->read(QStringLiteral("showtbar"), false).toBool();
+    bool showsbar = myApp.cfg->read(QStringLiteral("showsbar"), true).toBool();
+    bool lefttabs = myApp.cfg->read(QStringLiteral("lefttabs"), true).toBool();
+    bool iconset = myApp.cfg->read(QStringLiteral("iconset"), false).toBool();
 
 
     // 导出菜单
@@ -170,7 +216,7 @@ void MainWindow::initUI()
     }
     // 历史记录菜单
     QMenu *recentmenu = new QMenu(tr("&Recent files"));
-    // TODO
+    myApp.fhistory->setMenu(recentmenu);
     // 文件
     QMenu *filemenu = new QMenu(tr("&File"), this);
     {
@@ -197,16 +243,16 @@ void MainWindow::initUI()
     {
         QMenu *sizemenu = new QMenu(tr("Text Sizing..."));
         appendSubMenu(sizemenu, A_INCSIZE, tr("&Increase text size (SHIFT+mousewheel)\tSHIFT+PGUP"));
-        appendSubMenu(sizemenu, A_DECSIZE, tr("&Decrease text size (SHIFT+mousewheel)\tSHIFT+PGDN"));
+        appendSubMenu(sizemenu, A_DECSIZE, tr("&Decrease text size (SHIFT+mousewheel)\tSHIFT+PGDOWN"));
         appendSubMenu(sizemenu, A_RESETSIZE, tr("&Reset text sizes\tCTRL+SHIFT+s"));
         appendSubMenu(sizemenu, A_MINISIZE, tr("&Shrink text of all sub-grids\tCTRL+SHIFT+m"));
         sizemenu->addSeparator();
         appendSubMenu(sizemenu, A_INCWIDTH, tr("Increase column width (ALT+mousewheel)\tALT+PGUP"));
-        appendSubMenu(sizemenu, A_DECWIDTH, tr("Decrease column width (ALT+mousewheel)\tALT+PGDN"));
+        appendSubMenu(sizemenu, A_DECWIDTH, tr("Decrease column width (ALT+mousewheel)\tALT+PGDOWN"));
         appendSubMenu(sizemenu, A_INCWIDTHNH,
                       tr("Increase column width (no sub grids)\tCTRL+ALT+PGUP"));
         appendSubMenu(sizemenu, A_DECWIDTHNH,
-                      tr("Decrease column width (no sub grids)\tCTRL+ALT+PGDN"));
+                      tr("Decrease column width (no sub grids)\tCTRL+ALT+PGDOWN"));
         appendSubMenu(sizemenu, A_RESETWIDTH, tr("Reset column widths\tCTRL+SHIFT+w"));
 
         QMenu *bordmenu = new QMenu(tr("Set Grid Border Width..."));
@@ -425,7 +471,7 @@ void MainWindow::initUI()
     {
         appendSubMenu(scrollmenu, A_AUP, tr("Scroll Up (mousewheel)\tPGUP"));
         appendSubMenu(scrollmenu, A_AUP, tr("Scroll Up (mousewheel)\tALT+UP"));
-        appendSubMenu(scrollmenu, A_ADOWN, tr("Scroll Down (mousewheel)\tPGDN"));
+        appendSubMenu(scrollmenu, A_ADOWN, tr("Scroll Down (mousewheel)\tPGDOWN"));
         appendSubMenu(scrollmenu, A_ADOWN, tr("Scroll Down (mousewheel)\tALT+DOWN"));
         appendSubMenu(scrollmenu, A_ALEFT, tr("Scroll Left\tALT+LEFT"));
         appendSubMenu(scrollmenu, A_ARIGHT, tr("Scroll Right\tALT+RIGHT"));
@@ -446,7 +492,7 @@ void MainWindow::initUI()
     QMenu *viewmenu = new QMenu(tr("&View"), this);
     {
         appendSubMenu(viewmenu, A_ZOOMIN, tr("Zoom &In (CTRL+mousewheel)\tCTRL+PGUP"));
-        appendSubMenu(viewmenu, A_ZOOMOUT, tr("Zoom &Out (CTRL+mousewheel)\tCTRL+PGDN"));
+        appendSubMenu(viewmenu, A_ZOOMOUT, tr("Zoom &Out (CTRL+mousewheel)\tCTRL+PGDOWN"));
         appendSubMenu(viewmenu, A_NEXTFILE, tr("Switch to &next file/tab\tCTRL+TAB"));
         appendSubMenu(viewmenu, A_PREVFILE, tr("Switch to &previous file/tab\tCTRL+SHIFT+TAB"));
         appendSubMenu(viewmenu, A_FULLSCREEN,
@@ -470,13 +516,13 @@ void MainWindow::initUI()
     {
         QActionGroup *roundgroup = new QActionGroup(roundmenu);
         int roundcheck = myApp.cfg->roundness;
-        appendSubMenu(roundmenu, A_ROUND0, tr("Radius &0"), QString(), roundcheck == 0, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND1, tr("Radius &1"), QString(), roundcheck == 1, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND2, tr("Radius &2"), QString(), roundcheck == 2, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND3, tr("Radius &3"), QString(), roundcheck == 3, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND4, tr("Radius &4"), QString(), roundcheck == 4, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND5, tr("Radius &5"), QString(), roundcheck == 5, roundgroup);
-        appendSubMenu(roundmenu, A_ROUND6, tr("Radius &6"), QString(), roundcheck == 6, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND0, tr("Radius &0"), QString(), false, roundcheck == 0, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND1, tr("Radius &1"), QString(), false, roundcheck == 1, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND2, tr("Radius &2"), QString(), false, roundcheck == 2, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND3, tr("Radius &3"), QString(), false, roundcheck == 3, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND4, tr("Radius &4"), QString(), false, roundcheck == 4, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND5, tr("Radius &5"), QString(), false, roundcheck == 5, roundgroup);
+        appendSubMenu(roundmenu, A_ROUND6, tr("Radius &6"), QString(), false, roundcheck == 6, roundgroup);
     }
     //
     QMenu *optmenu = new QMenu(tr("&Options"), this);
@@ -487,24 +533,24 @@ void MainWindow::initUI()
         appendSubMenu(optmenu, A_COLCELL, tr("&Set Custom Color From Cell BG"));
         appendSubMenu(optmenu, A_DEFBGCOL, tr("Pick Document Background..."));
         optmenu->addSeparator();
-        appendSubMenu(optmenu, A_SHOWSBAR, tr("Show Statusbar"), QString(), showsbar);
-        appendSubMenu(optmenu, A_SHOWTBAR, tr("Show Toolbar"), QString(), showtbar);
-        appendSubMenu(optmenu, A_LEFTTABS, tr("File Tabs on the bottom"), QString(), lefttabs);
-        appendSubMenu(optmenu, A_TOTRAY, tr("Minimize to tray"), QString(), myApp.cfg->totray);
-        appendSubMenu(optmenu, A_MINCLOSE, tr("Minimize on close"), QString(), myApp.cfg->minclose);
-        appendSubMenu(optmenu, A_SINGLETRAY, tr("Single click maximize from tray"), QString(), myApp.cfg->singletray);
+        appendSubMenu(optmenu, A_SHOWSBAR, tr("Show Statusbar"), QString(), false, showsbar);
+        appendSubMenu(optmenu, A_SHOWTBAR, tr("Show Toolbar"), QString(), false, showtbar);
+        appendSubMenu(optmenu, A_LEFTTABS, tr("File Tabs on the bottom"), QString(), false, lefttabs);
+        appendSubMenu(optmenu, A_TOTRAY, tr("Minimize to tray"), QString(), false, myApp.cfg->totray);
+        appendSubMenu(optmenu, A_MINCLOSE, tr("Minimize on close"), QString(), false, myApp.cfg->minclose);
+        appendSubMenu(optmenu, A_SINGLETRAY, tr("Single click maximize from tray"), QString(), false, myApp.cfg->singletray);
         optmenu->addSeparator();
-        appendSubMenu(optmenu, A_ZOOMSCR, tr("Swap mousewheel scrolling and zooming"), QString(), myApp.cfg->zoomscroll);
-        appendSubMenu(optmenu, A_THINSELC, tr("Navigate in between cells with cursor keys"), QString(), myApp.cfg->thinselc);
+        appendSubMenu(optmenu, A_ZOOMSCR, tr("Swap mousewheel scrolling and zooming"), QString(), false, myApp.cfg->zoomscroll);
+        appendSubMenu(optmenu, A_THINSELC, tr("Navigate in between cells with cursor keys"), QString(), false, myApp.cfg->thinselc);
         optmenu->addSeparator();
-        appendSubMenu(optmenu, A_MAKEBAKS, tr("Create .bak files"), QString(), myApp.cfg->makebaks);
-        appendSubMenu(optmenu, A_AUTOSAVE, tr("Autosave to .tmp"), QString(), myApp.cfg->autosave);
-        appendSubMenu(optmenu, A_FSWATCH, tr("Auto reload documents"), tr("Reloads when another computer has changed a file (if you have made changes, asks)"), myApp.cfg->fswatch);
-        appendSubMenu(optmenu, A_AUTOEXPORT,  tr("Automatically export a .html on every save"), QString(), myApp.cfg->autohtmlexport);
+        appendSubMenu(optmenu, A_MAKEBAKS, tr("Create .bak files"), QString(), false, myApp.cfg->makebaks);
+        appendSubMenu(optmenu, A_AUTOSAVE, tr("Autosave to .tmp"), QString(), false, myApp.cfg->autosave);
+        appendSubMenu(optmenu, A_FSWATCH, tr("Auto reload documents"), tr("Reloads when another computer has changed a file (if you have made changes, asks)"), false, myApp.cfg->fswatch);
+        appendSubMenu(optmenu, A_AUTOEXPORT,  tr("Automatically export a .html on every save"), QString(), false, myApp.cfg->autohtmlexport);
         optmenu->addSeparator();
-        appendSubMenu(optmenu, A_CENTERED,  tr("Render document centered"), QString(), myApp.cfg->centered);
-        appendSubMenu(optmenu, A_FASTRENDER,  tr("Faster line rendering"), QString(), myApp.cfg->fastrender);
-        appendSubMenu(optmenu, A_ICONSET,  tr("Black and white toolbar icons"), QString(), iconset);
+        appendSubMenu(optmenu, A_CENTERED,  tr("Render document centered"), QString(), false, myApp.cfg->centered);
+        appendSubMenu(optmenu, A_FASTRENDER,  tr("Faster line rendering"), QString(), false, myApp.cfg->fastrender);
+        appendSubMenu(optmenu, A_ICONSET,  tr("Black and white toolbar icons"), QString(), false, iconset);
         optmenu->addMenu(roundmenu);
     }
     //
@@ -514,7 +560,7 @@ void MainWindow::initUI()
         if (!scriptpath.isEmpty())
         {
             int sidx = 0;
-            for (const QString &fn : QDir(scriptpath).entryList(QStringList() << QStringLiteral("*.lobster"), QDir::Files))
+            foreach (const QString &fn, QDir(scriptpath).entryList(QStringList() << QStringLiteral("*.lobster"), QDir::Files))
             {
                 auto ms = fn.section(QChar::fromLatin1('.'), 0, -2);
                 if (sidx < 26) {
@@ -522,7 +568,7 @@ void MainWindow::initUI()
                     ms += QChar::fromLatin1('A' + sidx);
                 }
                 appendSubMenu(scriptmenu, A_SCRIPT + sidx, ms);
-                //scripts_in_menu.push_back(fn);
+                myApp.cfg->scriptsInMenu << fn;
                 sidx++;
             }
         }
@@ -570,13 +616,19 @@ void MainWindow::initUI()
         menubar->addMenu(helpmenu);
         setMenuBar(menubar);
     }
+    else { } // 没有用到的上述菜单指针，被全局管理
 
+    const QString &toolbgcol = iconset ? QStringLiteral(TOOL_BGCOLOR0) : QStringLiteral(TOOL_BGCOLOR1);
     if (showtbar || mergetbar)
     {
         QToolBar *tb = new QToolBar(this);
+        tb->setMovable(false);
+
+        tb->setStyleSheet(QStringLiteral("QToolBar{background: %1;}").arg(toolbgcol));
+
         QString iconpath =
-            Tools::resolvePath(iconset ? "images/webalys/toolbar": "images/nuvola/toolbar", false);
-        auto sz = iconset ? QSize(18, 18) : QSize(22, 22);
+            Tools::resolvePath(iconset ? TOOL_ICON0: TOOL_ICON1, false);
+        auto sz = iconset ? QSize(TOOL_SIZE0, TOOL_SIZE0) : QSize(TOOL_SIZE1, TOOL_SIZE1);
         tb->setIconSize(sz);
 
         //double sc = iconset ? 1.0 : 22.0 / 48.0;
@@ -655,6 +707,8 @@ void MainWindow::initUI()
     if (showsbar) {
         // TODO
         QStatusBar *sb = new QStatusBar(this);
+        sb->setStyleSheet(QStringLiteral("QStatusBar{background: %1;}").arg(toolbgcol));
+
         QLabel *lb[3];
         sb->addWidget(new QLabel, 1);
         sb->addWidget(lb[0] = new QLabel, 0);
@@ -669,9 +723,10 @@ void MainWindow::initUI()
         setStatusBar(sb);
     }
     nb = new QTabWidget(this);
-    nb->setAutoFillBackground(true);
     nb->setMovable(true);
     setCentralWidget(nb);
+    nb->setFocusPolicy(Qt::StrongFocus);
+    nb->setFocus();
 
     auto desktop = QApplication::desktop();
     QRect clientRect = desktop->availableGeometry(desktop->screenNumber(this));
@@ -686,10 +741,13 @@ void MainWindow::initUI()
     int posx = myApp.cfg->read(QStringLiteral("posx"), boundary + clientRect.x()).toInt();
     int posy = myApp.cfg->read(QStringLiteral("posy"), boundary + clientRect.y()).toInt();
 
-    if (resx > screenx || resy > screeny ||
+    const bool b =
+            resx > screenx || resy > screeny ||
             posx < clientRect.x() || posy < clientRect.y() ||
             posx + resx > clientRect.width() + clientRect.x() ||
-            posy + resy > clientRect.height() + clientRect.y()) {
+            posy + resy > clientRect.height() + clientRect.y();
+    if (b)
+    {
         resx = defx;
         resy = defy;
         posx = posy = boundary;
@@ -705,5 +763,39 @@ void MainWindow::initUI()
     else
     {
         show();
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // TODO
+    // if close
+    if (!isHidden())
+    {
+        bool isM = isMaximized();
+        myApp.cfg->write(QStringLiteral("maximized"), isM);
+        if (!isM)
+        {
+            const auto &rect = geometry();
+            myApp.cfg->write(QStringLiteral("resx"), rect.width());
+            myApp.cfg->write(QStringLiteral("resy"), rect.height());
+            myApp.cfg->write(QStringLiteral("posx"), rect.x());
+            myApp.cfg->write(QStringLiteral("posy"), rect.y());
+        }
+    }
+    QMainWindow::closeEvent(event);
+}
+
+
+void MainWindow::timerEvent(QTimerEvent *event)
+{
+    int tid = event->timerId();
+    if (tid == blinkTimer)
+    {
+        // TODO
+    }
+    else if (savechecker)
+    {
+        // TODO
     }
 }

@@ -30,6 +30,11 @@ QVariant Config::read(const QString &key, const QVariant &def) const
     return setting->value(key, def);
 }
 
+void Config::write(const QString &key, const QVariant &value)
+{
+    setting->setValue(key, value);
+}
+
 void Config::reset()
 {
     customcolor = 0xffffff;

@@ -11,7 +11,8 @@ class Widget : public QWidget
 public:
     explicit Widget(QScrollArea *scroll);
 
-
+    //! TODO 临时
+    QString fn() { return QString(); }
 
 private:
     QScrollArea *scroll;
