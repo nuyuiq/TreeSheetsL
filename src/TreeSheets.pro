@@ -18,7 +18,8 @@ SOURCES += \
     mylog.cpp \
     server.cpp \
     config.cpp \
-    dropdown.cpp
+    dropdown.cpp \
+    document.cpp
 
 HEADERS += \
     history.h \
@@ -30,7 +31,9 @@ HEADERS += \
     mylog.h \
     server.h \
     config.h \
-    dropdown.h
+    dropdown.h \
+    document.h \
+    image.h
 
 FORMS +=
 

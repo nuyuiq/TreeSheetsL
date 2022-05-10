@@ -4,17 +4,16 @@
 #include <QWidget>
 
 class QScrollArea;
+struct Document;
 
 class Widget : public QWidget
 {
     Q_OBJECT
 public:
     explicit Widget(QScrollArea *scroll);
+    ~Widget();
 
-    //! TODO 临时
-    QString fn() { return QString(); }
-
-private:
+    Document *doc;
     QScrollArea *scroll;
 };
 

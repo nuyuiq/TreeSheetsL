@@ -6,6 +6,7 @@
 #include "config.h"
 #include "dropdown.h"
 #include "history.h"
+#include "document.h"
 
 #include <QScrollArea>
 #include <QIcon>
@@ -40,7 +41,7 @@ MainWindow::~MainWindow()
     killTimer(blinkTimer);
 }
 
-Widget *MainWindow::createWidget(const QString &name, bool append)
+Widget *MainWindow::createWidget(bool append)
 {
     QScrollArea*scroll = new QScrollArea;
     Q_ASSERT(scroll);
@@ -48,7 +49,7 @@ Widget *MainWindow::createWidget(const QString &name, bool append)
     Q_ASSERT(widget);
     widget->setFocusPolicy(Qt::StrongFocus);
     widget->setAttribute(Qt::WA_InputMethodEnabled, true);
-    nb->insertTab(append? -1: 0, scroll, name);
+    nb->insertTab(append? -1: 0, scroll, QString());
     return widget;
 }
 
@@ -124,8 +125,7 @@ Widget *MainWindow::getTabByFileName(const QString &fn)
         Q_ASSERT(sa);
         auto win = qobject_cast<Widget*>(sa->widget());
         Q_ASSERT(win);
-        // TODO
-        if (win->fn() == fn)
+        if (win->doc->filename == fn)
         {
             nb->setCurrentIndex(i);
             return win;
@@ -433,7 +433,7 @@ void MainWindow::initUI()
         // F10 is tied to the OS on both Ubuntu and OS X, and SHIFT+F10 is now right
         // click on all platforms?
         appendSubMenu(editmenu, A_FOLD,
-              #ifndef WIN32
+              #ifndef Q_OS_WIN
                       tr("Toggle Fold\tCTRL+F10"),
               #else
                       tr("Toggle Fold\tF10"),
@@ -560,7 +560,8 @@ void MainWindow::initUI()
         if (!scriptpath.isEmpty())
         {
             int sidx = 0;
-            foreach (const QString &fn, QDir(scriptpath).entryList(QStringList() << QStringLiteral("*.lobster"), QDir::Files))
+            const QStringList &ls = QDir(scriptpath).entryList(QStringList() << QStringLiteral("*.lobster"), QDir::Files);
+            foreach (const QString &fn, ls)
             {
                 auto ms = fn.section(QChar::fromLatin1('.'), 0, -2);
                 if (sidx < 26) {

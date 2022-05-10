@@ -96,7 +96,8 @@ ImageDropdown::ImageDropdown(int sel, int width, int msc, const QString &path, Q
     setMaximumWidth(width);
     setMaxVisibleItems(msc);
     setItemDelegate(new ItemDelegate(1, this));
-    foreach (const QString &imgfn, QDir(path).entryList(QStringList()<<QStringLiteral("*.*"), QDir::Files))
+    const QStringList &ls = QDir(path).entryList(QStringList()<<QStringLiteral("*.*"), QDir::Files);
+    foreach (const QString &imgfn, ls)
     {
         QPixmap img;
         if (img.load(path + "/" +imgfn))

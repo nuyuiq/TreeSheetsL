@@ -20,7 +20,7 @@ public:
     ~MainWindow();
 
     //! 创建新页面
-    Widget *createWidget(const QString &name = QString(), bool append = false);
+    Widget *createWidget(bool append = false);
 
     void appendSubMenu(
             QMenu *menu, int tag, const QString &contents,

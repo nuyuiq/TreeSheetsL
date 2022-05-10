@@ -233,6 +233,14 @@ struct CfgCache {
 
 };
 
+enum {
+    TS_VERSION = 19,
+    TS_TEXT = 0,
+    TS_GRID,
+    TS_BOTH,
+    TS_NEITHER
+};
+
 
 class Config : public CfgCache
 {
