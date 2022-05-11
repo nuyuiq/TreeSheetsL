@@ -19,7 +19,11 @@ SOURCES += \
     server.cpp \
     config.cpp \
     dropdown.cpp \
-    document.cpp
+    document.cpp \
+    cell.cpp \
+    grid.cpp \
+    text.cpp \
+    selection.cpp
 
 HEADERS += \
     history.h \
@@ -33,11 +37,19 @@ HEADERS += \
     config.h \
     dropdown.h \
     document.h \
-    image.h
+    image.h \
+    cell.h \
+    grid.h \
+    text.h \
+    selection.h
 
 FORMS +=
 
 DESTDIR = $$PWD/../app
+
+
+DEFINES += SIMPLERENDER
+
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

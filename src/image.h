@@ -10,7 +10,7 @@ class Image;
 typedef QList<QWeakPointer<Image> > ImagesRef;
 typedef QSharedPointer<Image> ImagePtr;
 typedef QList<ImagePtr> Images;
-
+Q_DECLARE_METATYPE(Images)
 
 //typedef QImage Image;
 class Image : public QImage {

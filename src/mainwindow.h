@@ -10,6 +10,7 @@ class QLineEdit;
 class ColorDropdown;
 class ImageDropdown;
 class QFileSystemWatcher;
+class QLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -33,15 +34,18 @@ public:
     void fileChangeWatch(const QString &file);
     //! 从一打开的文档中选中对应名字的画板
     Widget *getTabByFileName(const QString &fn);
+    //! 仅返回面板，不切换
+    Widget *getTabByIndex(int i) const;
 
 
     QTabWidget*nb;
     QSystemTrayIcon *trayIcon;
     QMenu *editmenupopup;
     QLineEdit *filter, *replaces;
+    QFileSystemWatcher *watcher;
+    QLabel*sbl[4];
     ColorDropdown *celldd, *textdd, *borddd;
     ImageDropdown *idd;
-    QFileSystemWatcher *watcher;
 
 
 

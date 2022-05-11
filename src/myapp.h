@@ -10,7 +10,8 @@ class MyLog;
 class Server;
 class Config;
 class FileHistory;
-class Cell;
+struct Cell;
+class Document;
 class QString;
 
 
@@ -37,6 +38,9 @@ struct MyApp
 
     //! 更新全局图片缓存
     ImagePtr wrapImage(const Image &img);
+
+    //! 记录文件使用
+    void fileUsed(const QString &filename, Document *doc);
 
     //! 加载翻译文件
     void loadTranslation(const QString &filename);

@@ -7,6 +7,8 @@
 #include "config.h"
 #include "history.h"
 #include "document.h"
+#include "cell.h"
+#include "widget.h"
 
 #include <QLocale>
 #include <QTranslator>
@@ -14,10 +16,9 @@
 #include <QApplication>
 #include <QFile>
 #include <QMessageBox>
-#include <QDataStream>
 #include <QDateTime>
-#include <cmath>
-#include <QtEndian>
+#include <QBuffer>
+#include <QFileInfo>
 
 // 全局变量
 MyApp myApp;
@@ -44,12 +45,10 @@ static void docInit(const QString &filename)
 
     if (!myApp.frame->nb->count())
     {
-        int numfiles = myApp.cfg->read(QStringLiteral("numopenfiles"), 0).toInt();
-        for (int i = 0; i < numfiles; i++)
+        const auto &fs = myApp.fhistory->getOpenFiles();
+        foreach (const QString &fn, fs)
         {
-            QString fn = QStringLiteral("lastopenfile_%d").arg(i);
-            fn = myApp.cfg->read(fn, i).toString();
-            if (!fn.isEmpty()) myApp.LoadDB(fn, false);
+            myApp.LoadDB(fn, false);
         }
     }
 
@@ -60,64 +59,6 @@ static void docInit(const QString &filename)
 
     // ScriptInit(frame);
 }
-
-class File : public QFile
-{
-public:
-    File(const QString &name) : QFile(name) {}
-    QString readString()
-    {
-        quint16 len = 0;
-        if (read((char*)&len, 2) != 2) return QString();
-        QByteArray d = read(len);
-        if (d.size() != len) return QString();
-        return QString::fromUtf8(d);
-    }
-    qint32 readInt32()
-    {
-        char buff[4];
-        if (read(buff, 4) != 4) return 0;
-        return qFromBigEndian<qint32>((uchar*)buff);
-    }
-    double readDouble()
-    {
-        char bytes[10];
-        if (read(bytes, 10) != 10) return 0.;
-
-        double f;
-        qint32 expon;
-        quint32 hiMant, loMant;
-
-        expon = ((bytes[0] & 0x7F) << 8) | (bytes[1] & 0xFF);
-        hiMant = ((quint32)(bytes[2] & 0xFF) << 24)
-                | ((quint32)(bytes[3] & 0xFF) << 16)
-                | ((quint32)(bytes[4] & 0xFF) << 8)
-                | ((quint32)(bytes[5] & 0xFF));
-        loMant = ((quint32)(bytes[6] & 0xFF) << 24)
-                | ((quint32)(bytes[7] & 0xFF) << 16)
-                | ((quint32)(bytes[8] & 0xFF) << 8)
-                | ((quint32)(bytes[9] & 0xFF));
-
-        if (expon == 0 && hiMant == 0 && loMant == 0)
-        {
-            f = 0;
-        }
-        else
-        {
-            if (expon == 0x7FFF)
-            { /* Infinity or NaN */
-                f = HUGE_VAL;
-            }
-            else
-            {
-                expon -= 16383;
-                f  = ldexp(double (hiMant), expon-=31);
-                f += ldexp(double (loMant), expon-=32);
-            }
-        }
-        return (bytes[0] & 0x80)? -f: f;
-    }
-};
 
 // 初始化
 bool MyApp::Init()
@@ -213,124 +154,125 @@ QString MyApp::LoadDB(const QString &filename, bool fromreload)
         }
     }
 
-
-//    Document *doc = nullptr;
     bool anyimagesfailed = false;
+    Document *doc = nullptr;
+    QVariantMap info;
 
     {  // limit destructors
-        File fis(fn);
-        if (!fis.open(QIODevice::ReadOnly)) return tr("Cannot open file.");
+        QFile dfile(fn);
+        if (!dfile.open(QIODevice::ReadOnly))
+            return tr("Cannot open file.");
+
+        Tools::DataIO fis(&dfile);
         char buf[4];
         quint8 version;
         fis.read(buf, 4);
-        if (strncmp(buf, "TSFF", 4)) return tr("Not a TreeSheets file.");
-        fis.read((char*)&version, 1);
-        if (version > TS_VERSION) return tr("File of newer version.");
+        if (strncmp(buf, "TSFF", 4))
+            return tr("Not a TreeSheets file.");
 
-        // auto fakelasteditonload = QDateTime::currentMSecsSinceEpoch();
+        fis.read((char*)&version, 1);
+        if (version > TS_VERSION)
+            return tr("File of newer version.");
+
+        info[QStringLiteral("version")] = int (version);
+        info[QStringLiteral("fakelasteditonload")] = QDateTime::currentMSecsSinceEpoch();
 
         Images imgs;
-        for (;;) {
+        forever
+        {
             fis.read(buf, 1);
-            switch (*buf) {
-                case 'I': {
-                    if (version < 9) fis.readString();
-                    double sc = version >= 19 ? fis.readDouble() : 1.0;
+            if (*buf == 'I')
+            {
+                if (version < 9) fis.readString();
+                double sc = version >= 19 ? fis.readDouble() : 1.0;
 
-                    QImage im;
-                    off_t beforepng = fis.pos();
-                    bool ok = im.load(&fis, "PNG");
-
-                    if (!ok)
+                QImage im;
+                off_t beforepng = fis.pos();
+                bool ok = im.load(fis.d(), nullptr);
+                if (!ok)
+                {
+                    // Uhoh.. the decoder failed. Try to save the situation by skipping this
+                    // PNG.
+                    anyimagesfailed = true;
+                    if (beforepng <= 0) return tr("Cannot tell/seek document?");
+                    fis.seek(beforepng);
+                    // Now try to skip past this PNG
+                    char header[8];
+                    fis.read(header, 8);
+                    uchar expected[] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+                    if (memcmp(header, expected, 8)) return tr("Corrupt PNG header.");
+                    fis.setByteOrder(DIO_BO_BIG);
+                    for (;;)  // Skip all chunks.
                     {
-                        // Uhoh.. the decoder failed. Try to save the situation by skipping this
-                        // PNG.
-                        anyimagesfailed = true;
-                        if (beforepng <= 0) return tr("Cannot tell/seek document?");
-                        fis.seek(beforepng);
-                        // Now try to skip past this PNG
-                        char header[8];
-                        fis.read(header, 8);
-                        uchar expected[] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
-                        if (memcmp(header, expected, 8)) return tr("Corrupt PNG header.");
-                        for (;;)  // Skip all chunks.
-                        {
-                            qint32 len = fis.readInt32();
-                            char fourcc[4];
-                            fis.read(fourcc, 4);
-                            fis.seek(len + fis.pos());  // skip data
-                            fis.readInt32();                   // skip CRC
-                            if (memcmp(fourcc, "IEND", 4) == 0) break;
-                        }
-                        // Set empty image here, since document expect there to be one here.
-                        int sz = 32;
-                        im = QImage(sz, sz, QImage::Format_RGB888);
-                        im.fill(Qt::red);
+                        qint32 len = fis.readInt32();
+                        char fourcc[4];
+                        fis.read(fourcc, 4);
+                        fis.seek(len + fis.pos());  // skip data
+                        fis.readInt32();                   // skip CRC
+                        if (memcmp(fourcc, "IEND", 4) == 0) break;
                     }
-                    imgs << wrapImage(Image(im, sc));
-                    break;
+                    fis.setByteOrder(DIO_BO_Little);
+                    // Set empty image here, since document expect there to be one here.
+                    int sz = 32;
+                    im = QImage(sz, sz, QImage::Format_RGB888);
+                    im.fill(Qt::red);
+                }
+                imgs << wrapImage(Image(im, sc));
+            }
+            else if (*buf == 'D')
+            {
+                auto databuff = fis.readAll();
+                int len = databuff.size();
+                databuff = qUncompress(QByteArray((char*)&len, 4) + databuff);
+                if (!databuff.size()) return tr("Cannot decompress file.");
+                QBuffer dbuff(&databuff);
+                dbuff.open(QIODevice::ReadOnly);
+                Tools::DataIO dis(&dbuff);
+
+                info[QStringLiteral("imgs")] = QVariant::fromValue(imgs);
+                int numcells = 0, textbytes = 0;
+                Cell *root = Cell::loadWhich(dis, nullptr, numcells, textbytes, info);
+                if (!root) return tr("File corrupted!");
+
+                Widget *widget = frame->createWidget(true);
+                doc = widget->doc;
+                if (loadedfromtmp)
+                {
+                    // if not, user will lose tmp without warning when he closes
+                    doc->undolistsizeatfullsave = -1;
+                    doc->modified = true;
+                }
+                doc->initWith(root, filename);
+
+                if (version >= 11)
+                {
+                    forever
+                    {
+                        const QString &s = dis.readString();
+                        if (s.isEmpty()) break;
+                        doc->tags.insert(s, true);
+                    }
                 }
 
-                case 'D': {
-//                    wxZlibInputStream zis(fis);
-                    auto databuff = fis.readAll();
-                    int len = databuff.size();
-                    databuff = qUncompress(QByteArray((char*)&len, 4) + databuff);
-                    if (!databuff.size()) return tr("Cannot decompress file.");
-
-//                    wxDataInputStream dis(zis);
-//                    int numcells = 0, textbytes = 0;
-//                    Cell *root = Cell::LoadWhich(dis, nullptr, numcells, textbytes);
-//                    if (!root) return _(L"File corrupted!");
-
-//                    doc = NewTabDoc(true);
-//                    if (loadedfromtmp) {
-//                        doc->undolistsizeatfullsave =
-//                            -1;  // if not, user will lose tmp without warning when he closes
-//                        doc->modified = true;
-//                    }
-//                    doc->InitWith(root, filename);
-
-//                    if (versionlastloaded >= 11) {
-//                        for (;;) {
-//                            wxString s = dis.ReadString();
-//                            if (!s.Len()) break;
-//                            doc->tags[s] = true;
-//                        }
-//                    }
-
-//                    doc->sw->Status(wxString::Format(_(L"Loaded %s (%d cells, %d characters)."),
-//                                                     filename.c_str(), numcells, textbytes)
-//                                        .c_str());
-
-//                    goto done;
-                }
-
-                default: return tr("Corrupt block header.");
+                doc->sw->status(tr("Loaded %3 (%1 cells, %2 characters).")
+                                .arg(numcells).arg(textbytes).arg(filename));
+                break;
+            }
+            else
+            {
+                return tr("Corrupt block header.");
             }
         }
     }
+    fileUsed(filename, doc);
 
-//done:
+    doc->clearSelectionRefresh();
 
-//    FileUsed(filename, doc);
-
-//    doc->ClearSelectionRefresh();
-
-//    if (anyimagesfailed)
-//        wxMessageBox(
-//            _(L"PNG decode failed on some images in this document\nThey have been replaced by "
-//              L"red squares."),
-//            _(L"PNG decoder failure"), wxOK, frame);
-
-//    return L"";
-
-
-
-
-
-
-
+    if (anyimagesfailed)
+    {
+        QMessageBox::information(frame, tr("PNG decoder failure"),
+                                 tr("PNG decode failed on some images in this document\nThey have been replaced by red squares."));
+    }
     return QString();
 }
 
@@ -369,6 +311,19 @@ ImagePtr MyApp::wrapImage(const Image &img)
     ImagePtr ret(new Image(img));
     imageRef->append(ret.toWeakRef());
     return ret;
+}
+
+void MyApp::fileUsed(const QString &filename, Document *doc)
+{
+    fhistory->addFileToHistory(filename);
+    fhistory->rememberOpenFiles();
+    if (cfg->fswatch)
+    {
+        QFileInfo fi = QFileInfo(filename);
+        doc->lastmodificationtime = fi.lastModified();
+        const QString &d = fi.absoluteFilePath();
+        frame->fileChangeWatch(d);
+    }
 }
 
 // 加载翻译文件

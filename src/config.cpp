@@ -37,6 +37,7 @@ void Config::write(const QString &key, const QVariant &value)
 
 void Config::reset()
 {
+    defaultmaxcolwidth = COLWIDTH_DEFAULTMAX;
     customcolor = 0xffffff;
     singletray = read(QStringLiteral("singletray"), false).toBool();
     roundness = read(QStringLiteral("roundness"), 3).toInt();
@@ -51,7 +52,6 @@ void Config::reset()
     centered = read(QStringLiteral("centered"), true).toBool();
     fastrender = read(QStringLiteral("fastrender"), true).toBool();
 }
-
 
 uint _g::celltextcolors[] = {
     0xFFFFFF,  // CUSTOM COLOR!

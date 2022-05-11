@@ -134,6 +134,16 @@ Widget *MainWindow::getTabByFileName(const QString &fn)
     return nullptr;
 }
 
+Widget *MainWindow::getTabByIndex(int i) const
+{
+    Q_ASSERT(i >= 0 && i < nb->count());
+    auto sa = qobject_cast<QScrollArea*>(nb->widget(i));
+    Q_ASSERT(sa);
+    auto win = qobject_cast<Widget*>(sa->widget());
+    Q_ASSERT(win);
+    return win;
+}
+
 void MainWindow::createShortcut(const QVariant &key, int kid)
 {
     const QKeySequence &ks = key.type() != QVariant::String?
@@ -706,22 +716,27 @@ void MainWindow::initUI()
     }
 
     if (showsbar) {
-        // TODO
         QStatusBar *sb = new QStatusBar(this);
         sb->setStyleSheet(QStringLiteral("QStatusBar{background: %1;}").arg(toolbgcol));
 
-        QLabel *lb[3];
-        sb->addWidget(new QLabel, 1);
-        sb->addWidget(lb[0] = new QLabel, 0);
-        sb->addWidget(lb[1] = new QLabel, 0);
-        sb->addWidget(lb[2] = new QLabel, 0);
-        lb[0]->setMinimumWidth(200);
-        lb[0]->setMaximumWidth(200);
-        lb[1]->setMinimumWidth(120);
-        lb[1]->setMaximumWidth(120);
-        lb[2]->setMinimumWidth(100);
-        lb[2]->setMaximumWidth(100);
+        sb->addWidget(sbl[0] = new QLabel, 1);
+        sb->addWidget(sbl[1] = new QLabel, 0);
+        sb->addWidget(sbl[2] = new QLabel, 0);
+        sb->addWidget(sbl[3] = new QLabel, 0);
+        sbl[1]->setMinimumWidth(200);
+        sbl[1]->setMaximumWidth(200);
+        sbl[2]->setMinimumWidth(120);
+        sbl[2]->setMaximumWidth(120);
+        sbl[3]->setMinimumWidth(100);
+        sbl[3]->setMaximumWidth(100);
         setStatusBar(sb);
+    }
+    else
+    {
+        sbl[0] = nullptr;
+        sbl[1] = nullptr;
+        sbl[2] = nullptr;
+        sbl[3] = nullptr;
     }
     nb = new QTabWidget(this);
     nb->setMovable(true);

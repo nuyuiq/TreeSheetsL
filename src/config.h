@@ -219,6 +219,7 @@ struct CfgCache {
     QStringList scriptsInMenu;
     int roundness;
     int customcolor;
+    int defaultmaxcolwidth;
     bool singletray;
     bool minclose;
     bool totray;
@@ -252,6 +253,7 @@ public:
     // 注意key的值，不要为空或含有模糊匹配字符 *
     void write(const QString &key, const QVariant &value);
     void reset();
+
 private:
     QSettings*setting;
 };

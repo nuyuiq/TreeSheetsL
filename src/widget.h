@@ -13,6 +13,8 @@ public:
     explicit Widget(QScrollArea *scroll);
     ~Widget();
 
+    void status(const QString &msg);
+
     Document *doc;
     QScrollArea *scroll;
 };

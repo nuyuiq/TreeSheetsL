@@ -3,6 +3,8 @@
 #include "config.h"
 #include "symdef.h"
 #include "mainwindow.h"
+#include "widget.h"
+#include "document.h"
 
 #include <QDebug>
 #include <QMenu>
@@ -24,33 +26,87 @@ void FileHistory::setMenu(QMenu *menu)
     refreshMenu();
 }
 
+void FileHistory::addFileToHistory(const QString &filename)
+{
+    if (historyfile.size() && historyfile.at(0) == filename) return;
+    historyfile.removeOne(filename);
+    historyfile.prepend(filename);
+    while (historyfile.size() > MAXCOUNT_HISTORY)
+    {
+        historyfile.removeLast();
+    }
+    dirty0 = true;
+}
+
+void FileHistory::rememberOpenFiles()
+{
+    int n = myApp.frame->nb->count();
+    QStringList fs;
+    for (int i = 0; i < n; i++)
+    {
+        auto *p = myApp.frame->getTabByIndex(i);
+        if (!p->doc->filename.isEmpty())
+        {
+            fs << p->doc->filename;
+        }
+    }
+    if (lastopenfile != fs)
+    {
+        lastopenfile = fs;
+        dirty1 = true;
+    }
+}
+
 void FileHistory::load()
 {
     const QString fm(QStringLiteral("file%1"));
-    files.clear();
+    historyfile.clear();
     for (int i = 1; i <= MAXCOUNT_HISTORY; i++)
     {
         const auto fn = myApp.cfg->read(fm.arg(i)).toString();
         if (fn.isEmpty()) break;
-        files << fn;
+        historyfile << fn;
     }
-    dirty = false;
+    dirty0 = false;
+    lastopenfile.clear();
+    int numfiles = myApp.cfg->read(QStringLiteral("numopenfiles"), 0).toInt();
+    for (int i = 0; i < numfiles; i++)
+    {
+        QString fn = QStringLiteral("lastopenfile_%d").arg(i);
+        fn = myApp.cfg->read(fn, i).toString();
+        if (!fn.isEmpty()) lastopenfile << fn;
+    }
+    dirty1 = false;
     refreshMenu();
 }
 
 void FileHistory::save()
 {
-    if (!dirty) return;
-    const QString fm(QStringLiteral("file%1"));
-    for (int i = 1; i <= files.size(); i++)
+    if (dirty0)
     {
-        myApp.cfg->write(fm.arg(i), files.at(i));
+        const QString fm(QStringLiteral("file%1"));
+        for (int i = 0; i < historyfile.size(); i++)
+        {
+            myApp.cfg->write(fm.arg(i + 1), historyfile.at(i));
+        }
+        if (historyfile.size() < MAXCOUNT_HISTORY)
+        {
+            const auto key = fm.at(historyfile.size() + 1);
+            if (!myApp.cfg->read(key).toString().isEmpty())
+            {
+                myApp.cfg->write(key, QVariant());
+            }
+        }
+        dirty0 = false;
     }
-    if (files.size() >= MAXCOUNT_HISTORY) return;
-    const auto key = fm.at(files.size() + 1);
-    if (!myApp.cfg->read(key).toString().isEmpty())
+    if (dirty1)
     {
-        myApp.cfg->write(key, QVariant());
+        for (int i = 0; i < lastopenfile.size(); i++)
+        {
+            myApp.cfg->write(QStringLiteral("lastopenfile_%d").arg(i), lastopenfile.at(i));
+        }
+        myApp.cfg->write(QStringLiteral("numopenfiles"), lastopenfile.size());
+        dirty1 = false;
     }
 }
 
@@ -58,8 +114,8 @@ void FileHistory::refreshMenu()
 {
     if (menu == nullptr) return;
     menu->clear();
-    for (int i = 0; i < files.size(); i++)
+    for (int i = 0; i < historyfile.size(); i++)
     {
-        myApp.frame->appendSubMenu(menu, A_FILEHIS0 + i, files.at(i), QString(), false);
+        myApp.frame->appendSubMenu(menu, A_FILEHIS0 + i, historyfile.at(i), QString(), false);
     }
 }

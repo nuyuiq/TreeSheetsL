@@ -31,5 +31,9 @@
 #define TOOL_ICON0 "images/webalys/toolbar"
 #define TOOL_ICON1 "images/nuvola/toolbar"
 
+// 默认最大列宽
+#define COLWIDTH_DEFAULTMAX 80
+
+
 #endif // SYMDEF
 
