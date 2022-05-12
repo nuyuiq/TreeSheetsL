@@ -2,12 +2,17 @@
 #define TEXT_H
 
 #include "image.h"
+
 #include <QString>
 #include <QDateTime>
+#include <QVariantMap>
 
 
 struct Cell;
+struct Document;
 class Selection;
+class QImage;
+class QPainter;
 namespace Tools { class DataIO; }
 
 
@@ -31,12 +36,19 @@ public:
     //! 从序列化中加载数据
     void load(Tools::DataIO &dis, QVariantMap &info);
 
+    bool isInSearch() const;
     void selectWord(Selection &s) const;
     void expandToWord(Selection &s) const;
     bool isWord(const QChar &c) const;
     QString getLinePart(int &i, int p, int l) const;
     QString getLine(int &i, int maxcolwidth) const;
+    void relSize(int dir, int zoomdepth);
+    QImage displayImage();
+    void disImgSize(int &xs, int &ys);
+    void textSize(QPainter &dc, int &sx, int &sy, bool tiny, int &leftoffset, int maxcolwidth);
+    int render(Document *doc, int bx, int by, int depth, QPainter &dc, int &leftoffset, int maxcolwidth);
 
+    inline int minRelsize(int rs) const { return qMin(relsize, rs); }
     //! 更新修改时间为当前
     inline void wasEdited() { lastedit = QDateTime::currentDateTime(); }
 

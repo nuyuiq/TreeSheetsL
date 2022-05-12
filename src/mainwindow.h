@@ -1,6 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "image.h"
+
 #include <QMainWindow>
 #include <QSystemTrayIcon>
 
@@ -22,7 +24,14 @@ public:
 
     //! 创建新页面
     Widget *createWidget(bool append = false);
-
+    //! 必须是文件，一次性，被触发后须重复
+    void fileChangeWatch(const QString &file);
+    //! 从一打开的文档中选中对应名字的画板
+    Widget *getTabByFileName(const QString &fn);
+    //! 仅返回面板，不切换
+    Widget *getTabByIndex(int i) const;
+    //! 标题
+    void setPageTitle(const QString &fn, const QString &mods, int page = -1);
     void appendSubMenu(
             QMenu *menu, int tag, const QString &contents,
             const QString &help=QString(),
@@ -30,14 +39,9 @@ public:
             int status=-1,
             QActionGroup *group=nullptr);
 
-    //! 必须是文件，一次性，被触发后须重复
-    void fileChangeWatch(const QString &file);
-    //! 从一打开的文档中选中对应名字的画板
-    Widget *getTabByFileName(const QString &fn);
-    //! 仅返回面板，不切换
-    Widget *getTabByIndex(int i) const;
-
-
+    ImagePtr foldicon;
+    ImagePtr line_nw;
+    ImagePtr line_sw;
     QTabWidget*nb;
     QSystemTrayIcon *trayIcon;
     QMenu *editmenupopup;
@@ -46,6 +50,7 @@ public:
     QLabel*sbl[4];
     ColorDropdown *celldd, *textdd, *borddd;
     ImageDropdown *idd;
+    QString searchstring;
 
 
 

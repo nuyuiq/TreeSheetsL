@@ -1,8 +1,15 @@
 #include "text.h"
 #include "tools.h"
 #include "selection.h"
+#include "config.h"
+#include "cell.h"
+#include "grid.h"
+#include "myapp.h"
+#include "mainwindow.h"
+#include "document.h"
 
 #include <QVariantMap>
+#include <QPainter>
 
 void Text::load(Tools::DataIO &dis, QVariantMap &info)
 {
@@ -42,6 +49,12 @@ void Text::load(Tools::DataIO &dis, QVariantMap &info)
         info[k] = time - 1;
     }
     lastedit = QDateTime::fromMSecsSinceEpoch(time);
+}
+
+bool Text::isInSearch() const
+{
+    return myApp.frame->searchstring.length() &&
+            t.toLower().indexOf(myApp.frame->searchstring) >= 0;
 }
 
 void Text::selectWord(Selection &s) const
@@ -124,4 +137,149 @@ QString Text::getLine(int &i, int maxcolwidth) const
     // we arrive here only
     // if a single word is too big for maxcolwidth, so simply return that word
     // return GetLinePart(i, l, l);     // big word was the last one
+}
+
+void Text::relSize(int dir, int zoomdepth)
+{
+    const int minv = _g::deftextsize - _g::mintextsize() + zoomdepth;
+    const int maxv = _g::deftextsize - _g::maxtextsize() - zoomdepth;
+    relsize = qMax(qMin(relsize + dir, minv), maxv);
+}
+
+QImage Text::displayImage()
+{
+    ImagePtr ptr = cell->grid && cell->grid->folded
+            ? myApp.frame->foldicon : image;
+    return ptr.data()? ptr->display(): QImage();
+}
+
+void Text::disImgSize(int &xs, int &ys)
+{
+    const auto &img = displayImage();
+    if (!img.isNull())
+    {
+        xs = img.width();
+        ys = img.height();
+    }
+}
+
+void Text::textSize(QPainter &dc, int &sx, int &sy, bool tiny, int &leftoffset, int maxcolwidth)
+{
+    sx = sy = 0;
+    int i = 0;
+    forever
+    {
+        const QString &curl = getLine(i, maxcolwidth);
+        if (!curl.length()) break;
+        int x, y;
+        if (tiny)
+        {
+            x = curl.length();
+            y = 1;
+        }
+        else
+        {
+            const QSize &s = dc.fontMetrics().size(Qt::TextSingleLine, curl);
+            x = s.width();
+            y = s.height();
+        }
+        sx = qMax(x, sx);
+        sy += y;
+        leftoffset = y;
+    }
+    if (!tiny) sx += 4;
+}
+
+static void myDrawText(QPainter &dc, const QString &s, int x, int y, int w, int h)
+{
+#ifdef __WXMSW__  // this special purpose implementation is because the MSW implementation calls
+    // TextExtent, which costs
+    // 25% of all cpu time
+    dc.CalcBoundingBox(x, y);
+    dc.CalcBoundingBox(x + w, y + h);
+    HDC hdc = (HDC)dc.GetHDC();
+    ::SetTextColor(hdc, dc.GetTextForeground().GetPixel());
+    ::SetBkColor(hdc, dc.GetTextBackground().GetPixel());
+    ::ExtTextOut(hdc, x, y, 0, nullptr, s.c_str(), s.length(), nullptr);
+#else
+    dc.drawText(dc.boundingRect(x, y, w, h, Qt::AlignLeft | Qt::AlignVCenter, s), s);
+#endif
+}
+
+int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &leftoffset, int maxcolwidth)
+{
+    int ixs = 0, iys = 0;
+    if (!cell->tiny)
+    {
+        disImgSize(ixs, iys);
+    }
+    if (ixs && iys)
+    {
+        dc.drawImage(bx + 1 + _g::margin_extra, by + (cell->tys - iys) / 2 + _g::margin_extra, displayImage());
+        ixs += 2;
+        iys += 2;
+    }
+
+    if (t.isEmpty()) return iys;
+
+    doc->pickFont(dc, depth, relsize, stylebits);
+
+    // TODO
+    int h = cell->tiny ? 1 : dc.fontMetrics().xHeight();
+    leftoffset = h;
+    int i = 0;
+    int lines = 0;
+    bool searchfound = isInSearch();
+    bool istag = cell->isTag(doc);
+
+    if (searchfound) dc.setPen(QColor(Qt::red));
+    else if (filtered) dc.setPen(QColor(Qt::lightGray));
+    else if (istag) dc.setPen(QColor(Qt::blue));
+    else if (cell->tiny) dc.setPen(QColor(myApp.cfg->pen_tinytext));
+    else if (cell->textcolor) dc.setPen(QColor(cell->textcolor)); // FIXME: clean up
+
+    forever
+    {
+        const QString &curl = getLine(i, maxcolwidth);
+        if (curl.isEmpty()) break;
+        if (cell->tiny)
+        {
+            if (myApp.cfg->fastrender)
+            {
+                dc.drawLine(bx + ixs, by + lines * h, bx + ixs + curl.length(), by + lines * h);
+                /*
+                        wxPoint points[] = { wxPoint(bx + ixs, by + lines * h), wxPoint(bx + ixs + curl.Len(), by + lines * h) };
+                        dc.DrawLines(1, points, 0, 0);
+                         */
+            }
+            else
+            {
+                int word = 0;
+                for (int p = 0; p < curl.length() + 1; p++)
+                {
+                    if (curl.length() <= p || curl[p] == QChar::fromLatin1(' '))
+                    {
+                        if (word)
+                        {
+                            dc.drawLine(bx + p - word + ixs, by + lines * h,
+                                              bx + p, by + lines * h);
+                        }
+                        word = 0;
+                    }
+                    else word++;
+                }
+            }
+        }
+        else
+        {
+            int tx = bx + 2 + ixs;
+            int ty = by + lines * h;
+            myDrawText(dc, curl, tx + _g::margin_extra, ty + _g::margin_extra, cell->sx, h);
+            if (searchfound || filtered || istag || cell->textcolor)
+                dc.setPen(QColor(Qt::black));
+        }
+        lines++;
+    }
+
+    return qMax(lines * h, iys);
 }

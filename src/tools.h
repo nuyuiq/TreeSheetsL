@@ -4,6 +4,8 @@
 #include <QString>
 #include <QIODevice>
 
+class QPainter;
+
 enum DIO_BO{ DIO_BO_BIG, DIO_BO_Little };
 
 namespace Tools {
@@ -14,6 +16,10 @@ QString resolvePath(const QString &path, bool exist);
 QString bakName(const QString &filename);
 QString tmpName(const QString &filename);
 QString extName(const QString &filename, const QString &ext);
+
+void drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline = false);
+
+
 
 class DataIO
 {

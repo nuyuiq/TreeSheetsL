@@ -24,10 +24,16 @@ struct Grid
     int *colwidths;
     int xs;
     int ys;
+
+    int view_margin;
+    int view_grid_outer_spacing;
     int user_grid_outer_spacing;
+    int cell_margin;
+
     int bordercolor;
     bool horiz;
     bool folded;
+    bool tinyborder;
 
 
     Grid(int _xs, int _ys, Cell *_c = nullptr);
@@ -39,6 +45,10 @@ struct Grid
     void move(int dx, int dy, Selection &s);
     void drawSelect(Document *doc, QPainter &dc, Selection &s, bool cursoronly);
     void insertCells(int dx, int dy, int nxs, int nys, Cell *nc = nullptr);
+    int minRelsize(int rs);
+    void resetChildren();
+    bool layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int startx, int starty, bool forcetiny);
+    void render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx, int sy, int xoff, int yoff);
 };
 
 #endif // GRID_H

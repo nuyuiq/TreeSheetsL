@@ -134,180 +134,179 @@ void Selection::dir(Document *doc, bool ctrl, bool shift, QPainter &dc, int dx, 
         if (x + xs > g->xs || y + ys > g->ys) g = nullptr;
 
         doc->scrollIfSelectionOutOfView(dc, *this, true);
+        return;
     }
-    else
+
+    doc->drawSelect(dc, *this);
+    if (ctrl && dx)  // implies textedit
     {
-        doc->drawSelect(dc, *this);
-        if (ctrl && dx)  // implies textedit
+        if (cursor == cursorend) firstdx = dx;
+        int &curs = firstdx < 0 ? cursor : cursorend;
+        for (int c = curs, start = curs;;)
+        {
+            c += dx;
+            if (c < 0 || c > maxCursor()) break;
+            QChar ch = getCell()->text.t.at((c + curs) / 2);
+            if (!ch.isLetterOrNumber() && curs != start) break;
+            curs = c;
+            if (!ch.isLetterOrNumber() && !ch.isSpace()) break;
+        }
+        if (shift)
+        {
+            if (cursorend < cursor) qSwap(cursorend, cursor);
+        }
+        else cursorend = cursor = curs;
+    }
+    else if (shift)
+    {
+        if (textedit)
         {
             if (cursor == cursorend) firstdx = dx;
-            int &curs = firstdx < 0 ? cursor : cursorend;
-            for (int c = curs, start = curs;;)
-            {
-                c += dx;
-                if (c < 0 || c > maxCursor()) break;
-                QChar ch = getCell()->text.t.at((c + curs) / 2);
-                if (!ch.isLetterOrNumber() && curs != start) break;
-                curs = c;
-                if (!ch.isLetterOrNumber() && !ch.isSpace()) break;
-            }
-            if (shift)
-            {
-                if (cursorend < cursor) qSwap(cursorend, cursor);
-            }
-            else cursorend = cursor = curs;
-        }
-        else if (shift)
-        {
-            if (textedit)
-            {
-                if (cursor == cursorend) firstdx = dx;
-                (firstdx < 0 ? cursor : cursorend) += dx;
-                if (cursor < 0) cursor = 0;
-                if (cursorend > maxCursor()) cursorend = maxCursor();
-            }
-            else
-            {
-                if (!xs) firstdx = 0;  // redundant: just in case someone else changed it
-                if (!ys) firstdy = 0;
-                if (!firstdx) firstdx = dx;
-                if (!firstdy) firstdy = dy;
-                if (firstdx < 0)
-                {
-                    x += dx;
-                    xs += -dx;
-                }
-                else xs += dx;
-                if (firstdy < 0)
-                {
-                    y += dy;
-                    ys += -dy;
-                }
-                else ys += dy;
-                if (x < 0)
-                {
-                    x = 0;
-                    xs--;
-                }
-                if (y < 0)
-                {
-                    y = 0;
-                    ys--;
-                }
-                if (x + xs > g->xs) xs--;
-                if (y + ys > g->ys) ys--;
-                if (!xs) firstdx = 0;
-                if (!ys) firstdy = 0;
-                if (!xs && !ys) g = nullptr;
-            }
+            (firstdx < 0 ? cursor : cursorend) += dx;
+            if (cursor < 0) cursor = 0;
+            if (cursorend > maxCursor()) cursorend = maxCursor();
         }
         else
         {
-            if (vs)
+            if (!xs) firstdx = 0;  // redundant: just in case someone else changed it
+            if (!ys) firstdy = 0;
+            if (!firstdx) firstdx = dx;
+            if (!firstdy) firstdy = dy;
+            if (firstdx < 0)
             {
-                if (ovs)  // (multi) cell selection
+                x += dx;
+                xs += -dx;
+            }
+            else xs += dx;
+            if (firstdy < 0)
+            {
+                y += dy;
+                ys += -dy;
+            }
+            else ys += dy;
+            if (x < 0)
+            {
+                x = 0;
+                xs--;
+            }
+            if (y < 0)
+            {
+                y = 0;
+                ys--;
+            }
+            if (x + xs > g->xs) xs--;
+            if (y + ys > g->ys) ys--;
+            if (!xs) firstdx = 0;
+            if (!ys) firstdy = 0;
+            if (!xs && !ys) g = nullptr;
+        }
+    }
+    else
+    {
+        if (vs)
+        {
+            if (ovs)  // (multi) cell selection
+            {
+                bool intracell = true;
+                if (textedit && !exitedit && getCell())
                 {
-                    bool intracell = true;
-                    if (textedit && !exitedit && getCell())
-                    {
-                        if (dy) {
-                            cursorend = cursor;
-                            Text &text = getCell()->text;
-                            int maxcolwidth = getCell()->p->grid->colwidths[x];
+                    if (dy) {
+                        cursorend = cursor;
+                        Text &text = getCell()->text;
+                        int maxcolwidth = getCell()->p->grid->colwidths[x];
 
-                            int i = 0;
-                            int laststart, lastlen;
-                            int nextoffset = -1;
-                            for (int l = 0;; l++)
+                        int i = 0;
+                        int laststart, lastlen;
+                        int nextoffset = -1;
+                        for (int l = 0;; l++)
+                        {
+                            int start = i;
+                            QString ls = text.getLine(i, maxcolwidth);
+                            int len = ls.length();
+                            int end = start + len;
+
+                            if (len && nextoffset >= 0)
                             {
-                                int start = i;
-                                QString ls = text.getLine(i, maxcolwidth);
-                                int len = ls.length();
-                                int end = start + len;
+                                cursor = cursorend =
+                                        start + (nextoffset > len ? len : nextoffset);
+                                intracell = false;
+                                break;
+                            }
 
-                                if (len && nextoffset >= 0)
+                            if (cursor >= start && cursor <= end)
+                            {
+                                if (dy < 0)
                                 {
-                                    cursor = cursorend =
-                                            start + (nextoffset > len ? len : nextoffset);
-                                    intracell = false;
+                                    if (l != 0)
+                                    {
+                                        cursor = cursorend =
+                                                laststart + (cursor - start > lastlen
+                                                             ? lastlen
+                                                             : cursor - start);
+                                        intracell = false;
+                                    }
                                     break;
                                 }
-
-                                if (cursor >= start && cursor <= end)
+                                else
                                 {
-                                    if (dy < 0)
-                                    {
-                                        if (l != 0)
-                                        {
-                                            cursor = cursorend =
-                                                    laststart + (cursor - start > lastlen
-                                                                 ? lastlen
-                                                                 : cursor - start);
-                                            intracell = false;
-                                        }
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        nextoffset = cursor - start;
-                                    }
+                                    nextoffset = cursor - start;
                                 }
-
-                                laststart = start;
-                                lastlen = len;
-
-                                if (!len) break;
-                            }
-                        }
-                        else
-                        {
-                            intracell = false;
-                            if (cursor != cursorend)
-                            {
-                                if (dx < 0) cursorend = cursor;
-                                else cursor = cursorend;
-                            }
-                            else if ((dx < 0 && cursor) || (dx > 0 && maxCursor() > cursor))
-                            {
-                                cursorend = cursor += dx;
                             }
 
+                            laststart = start;
+                            lastlen = len;
+
+                            if (!len) break;
                         }
                     }
-
-                    if (intracell)
+                    else
                     {
-                        if (myApp.cfg->thinselc)
+                        intracell = false;
+                        if (cursor != cursorend)
                         {
-                            if (dx + dy > 0) v += vs;
-                            vs = 0;  // make it a thin selection, in direction
-                            ovs = 1;
+                            if (dx < 0) cursorend = cursor;
+                            else cursor = cursorend;
                         }
-                        else
+                        else if ((dx < 0 && cursor) || (dx > 0 && maxCursor() > cursor))
                         {
-                            if (x + dx >= 0 && x + dx + xs <= g->xs && y + dy >= 0 &&
-                                    y + dy + ys <= g->ys)
-                            {
-                                x += dx;
-                                y += dy;
-                            }
+                            cursorend = cursor += dx;
                         }
-                        exitEdit(doc);
+
                     }
                 }
-                else if (notboundarypar)  // thin selection, moving in parallel direction
+
+                if (intracell)
                 {
-                    v += dx + dy;
+                    if (myApp.cfg->thinselc)
+                    {
+                        if (dx + dy > 0) v += vs;
+                        vs = 0;  // make it a thin selection, in direction
+                        ovs = 1;
+                    }
+                    else
+                    {
+                        if (x + dx >= 0 && x + dx + xs <= g->xs && y + dy >= 0 &&
+                                y + dy + ys <= g->ys)
+                        {
+                            x += dx;
+                            y += dy;
+                        }
+                    }
+                    exitEdit(doc);
                 }
             }
-            else if (notboundaryperp)  // thin selection, moving in perpendicular direction
+            else if (notboundarypar)  // thin selection, moving in parallel direction
             {
-                if (dx + dy < 0) v--;
-                vs = 1;  // make it a cell selection
+                v += dx + dy;
             }
         }
-        doc->drawSelectMove(dc, *this);
+        else if (notboundaryperp)  // thin selection, moving in perpendicular direction
+        {
+            if (dx + dy < 0) v--;
+            vs = 1;  // make it a cell selection
+        }
     }
+    doc->drawSelectMove(dc, *this);
 }
 
 void Selection::Cursor(Document *doc, int k, bool ctrl, bool shift, QPainter &dc, bool exitedit)

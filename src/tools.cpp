@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QtEndian>
 #include <cmath>
+#include <QPainter>
 
 QString Tools::resolvePath(const QString &path, bool exist)
 {
@@ -111,4 +112,13 @@ double Tools::DataIO::readDouble()
         }
     }
     return (bytes[0] & 0x80)? -f: f;
+}
+
+void Tools::drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline)
+{
+    const QColor qcolor(color);
+    if (outline) dc.setBrush(QBrush(Qt::transparent));
+    else dc.setBrush(QBrush(qcolor));
+    dc.setPen(QPen(qcolor));
+    dc.drawRect(x, y, xs, ys);
 }

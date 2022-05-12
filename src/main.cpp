@@ -5,7 +5,7 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    int ec = myApp.Init()? a.exec(): 0;
-    myApp.Relese();
+    int ec = myApp.init()? a.exec(): 0;
+    myApp.relese();
     return ec;
 }

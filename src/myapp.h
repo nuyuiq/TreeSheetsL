@@ -11,7 +11,7 @@ class Server;
 class Config;
 class FileHistory;
 struct Cell;
-class Document;
+struct Document;
 class QString;
 
 
@@ -27,14 +27,14 @@ struct MyApp
     ImagesRef *imageRef;
 
 
-    bool Init();
-    void Relese();
+    bool init();
+    void relese();
 
     //! 加载本地文件
-    QString LoadDB(const QString &filename, bool fromreload);
+    QString loadDB(const QString &filename, bool fromreload);
 
     //! 初始化空文档
-    Cell *InitDB(int sizex, int sizey = 0);
+    Cell *initDB(int sizex, int sizey = 0);
 
     //! 更新全局图片缓存
     ImagePtr wrapImage(const Image &img);

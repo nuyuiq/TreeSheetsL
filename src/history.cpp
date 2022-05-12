@@ -72,7 +72,7 @@ void FileHistory::load()
     int numfiles = myApp.cfg->read(QStringLiteral("numopenfiles"), 0).toInt();
     for (int i = 0; i < numfiles; i++)
     {
-        QString fn = QStringLiteral("lastopenfile_%d").arg(i);
+        QString fn = QStringLiteral("lastopenfile_%1").arg(i);
         fn = myApp.cfg->read(fn, i).toString();
         if (!fn.isEmpty()) lastopenfile << fn;
     }
@@ -103,7 +103,7 @@ void FileHistory::save()
     {
         for (int i = 0; i < lastopenfile.size(); i++)
         {
-            myApp.cfg->write(QStringLiteral("lastopenfile_%d").arg(i), lastopenfile.at(i));
+            myApp.cfg->write(QStringLiteral("lastopenfile_%1").arg(i), lastopenfile.at(i));
         }
         myApp.cfg->write(QStringLiteral("numopenfiles"), lastopenfile.size());
         dirty1 = false;

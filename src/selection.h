@@ -3,7 +3,7 @@
 
 struct Grid;
 struct Cell;
-class Document;
+struct Document;
 class QPainter;
 class QChar;
 

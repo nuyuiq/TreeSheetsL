@@ -3,8 +3,9 @@
 
 #include "text.h"
 
+#include <QVariantMap>
 
-class Document;
+struct Document;
 struct Grid;
 namespace Tools { class DataIO; }
 
@@ -47,11 +48,13 @@ struct Cell
     int minx;
     int miny;
     int ycenteroff;
-//    int txs;
-//    int tys;
+    int txs;
+    int tys;
+    uint actualcellcolor;
     quint8 celltype;
     quint8 drawstyle;
     bool verticaltextandgrid;
+    bool tiny;
 
 
     Cell(Cell *_p = nullptr,
@@ -67,6 +70,20 @@ struct Cell
     void addUndo(Document *doc);
     void resetLayout();
     void reset();
+    void resetChildren();
+    bool isTag(Document *doc) const;
+    // the smallest relsize is actually the biggest text
+    int minRelsize();
+    bool gridShown(Document *doc) const;
+    void lazyLayout(Document *doc, QPainter &dc, int depth, int maxcolwidth, bool forcetiny);
+    void layout(Document *doc, QPainter &dc, int depth, int maxcolwidth, bool forcetiny);
+    void render(Document *doc, int bx, int by, QPainter &dc, int depth, int ml, int mr, int mt, int mb, int maxcolwidth, int cell_margin);
+
+    inline bool hasText() const { return !text.t.isEmpty(); }
+    inline bool hasTextSize() const { return hasText() || text.relsize; }
+    inline bool hasTextState() const { return hasTextSize() || text.image.data(); }
+    inline bool hasHeader() const { return hasText() || text.image.data(); }
+    inline bool hasContent() const { return hasHeader() || grid; }
 
     static Cell*loadWhich(Tools::DataIO &dis, Cell *parent, int &numcells, int &textbytes, QVariantMap &info);
 };

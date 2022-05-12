@@ -24,13 +24,13 @@
 MyApp myApp;
 
 //! 加载示例、教程
-static void LoadTut()
+static void loadTut()
 {
     const auto &lang = QLocale::system().name().left(2);
     QString fn = Tools::resolvePath(QStringLiteral("examples/tutorial-%1.cts").arg(lang), false);
-    if (!myApp.LoadDB(fn, false).isEmpty())
+    if (!myApp.loadDB(fn, false).isEmpty())
     {
-        myApp.LoadDB(Tools::resolvePath(QStringLiteral("examples/tutorial.cts"), false), false);
+        myApp.loadDB(Tools::resolvePath(QStringLiteral("examples/tutorial.cts"), false), false);
     }
 }
 
@@ -40,7 +40,7 @@ static void docInit(const QString &filename)
     // 启动请求打开文档
     if (!filename.isEmpty())
     {
-        myApp.LoadDB(filename, false);
+        myApp.loadDB(filename, false);
     }
 
     if (!myApp.frame->nb->count())
@@ -48,20 +48,20 @@ static void docInit(const QString &filename)
         const auto &fs = myApp.fhistory->getOpenFiles();
         foreach (const QString &fn, fs)
         {
-            myApp.LoadDB(fn, false);
+            myApp.loadDB(fn, false);
         }
     }
 
-    if (!myApp.frame->nb->count()) LoadTut();
+    if (!myApp.frame->nb->count()) loadTut();
 
-    if (!myApp.frame->nb->count()) myApp.InitDB(10);
+    if (!myApp.frame->nb->count()) myApp.initDB(10);
 
 
     // ScriptInit(frame);
 }
 
 // 初始化
-bool MyApp::Init()
+bool MyApp::init()
 {
     QString filename;
     // 是否以便携启动
@@ -117,7 +117,7 @@ bool MyApp::Init()
     return true;
 }
 
-void MyApp::Relese()
+void MyApp::relese()
 {
     DELPTR(imageRef);
     DELPTR(frame);
@@ -128,7 +128,7 @@ void MyApp::Relese()
 }
 
 // 加载本地文件
-QString MyApp::LoadDB(const QString &filename, bool fromreload)
+QString MyApp::loadDB(const QString &filename, bool fromreload)
 {
     // TODO
     QString fn = filename;
@@ -276,7 +276,7 @@ QString MyApp::LoadDB(const QString &filename, bool fromreload)
     return QString();
 }
 
-Cell *MyApp::InitDB(int sizex, int sizey)
+Cell *MyApp::initDB(int sizex, int sizey)
 {
     // TODO
 

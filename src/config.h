@@ -217,9 +217,11 @@ enum {
 struct CfgCache {
     QMap<QString, QString> menuShortcutMap;
     QStringList scriptsInMenu;
+    QString defaultfont;
     int roundness;
     int customcolor;
     int defaultmaxcolwidth;
+    uint pen_tinytext;
     bool singletray;
     bool minclose;
     bool totray;
@@ -240,6 +242,14 @@ enum {
     TS_GRID,
     TS_BOTH,
     TS_NEITHER
+};
+
+enum {
+    STYLE_BOLD = 1,
+    STYLE_ITALIC = 2,
+    STYLE_FIXED = 4,
+    STYLE_UNDERLINE = 8,
+    STYLE_STRIKETHRU = 16
 };
 
 
@@ -268,6 +278,17 @@ extern uint celltextcolors[];
 extern const int celltextcolors_size;
 #define CUSTOMCOLORIDX 0
 
+extern const int scrollratecursor;
+extern const int scrollratewheel;
+extern const int grid_left_offset;
+extern const int grid_margin;
+extern const int cell_margin;
+extern const int margin_extra;
+extern const int line_width;
+extern const int selmargin;
+extern int deftextsize;
+extern int mintextsize();
+extern int maxtextsize();
 }
 
 #endif // CONFIG_H

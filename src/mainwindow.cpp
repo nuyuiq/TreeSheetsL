@@ -47,9 +47,8 @@ Widget *MainWindow::createWidget(bool append)
     Q_ASSERT(scroll);
     Widget* widget = new Widget(scroll);
     Q_ASSERT(widget);
-    widget->setFocusPolicy(Qt::StrongFocus);
-    widget->setAttribute(Qt::WA_InputMethodEnabled, true);
     nb->insertTab(append? -1: 0, scroll, QString());
+    widget->resize(scroll->size());
     return widget;
 }
 
@@ -144,6 +143,21 @@ Widget *MainWindow::getTabByIndex(int i) const
     return win;
 }
 
+void MainWindow::setPageTitle(const QString &fn, const QString &mods, int page)
+{
+    int curidx = nb->currentIndex();
+    if (page < 0) page = curidx;
+    if (page < 0) return;
+    if (page == curidx)
+    {
+        setWindowTitle(QStringLiteral("TreeSheets - ") + fn + mods);
+    }
+    const QString &nt = fn.isEmpty()?
+                QStringLiteral("<unnamed>") :
+                QFileInfo(fn).fileName();
+    nb->setTabText(page, nt + mods);
+}
+
 void MainWindow::createShortcut(const QVariant &key, int kid)
 {
     const QKeySequence &ks = key.type() != QVariant::String?
@@ -173,6 +187,15 @@ void MainWindow::initUI()
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
             this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
     trayIcon->setIcon(QIcon(imgspath + ICON_FILEPATH));
+
+    {
+        QString p = Tools::resolvePath(QStringLiteral("images/nuvola/fold.png"), true);
+        if (!p.isEmpty()) foldicon = ImagePtr(new Image(QImage(p), 1 / 3));
+        p =  Tools::resolvePath(QStringLiteral("images/render/line_nw.png"), true);
+        if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1 / 3));
+        p =  Tools::resolvePath(QStringLiteral("images/render/line_sw.png"), true);
+        if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1 / 3));
+    }
 
     bool mergetbar = myApp.cfg->read(QStringLiteral("mergetbar"), true).toBool();
     bool showtbar = myApp.cfg->read(QStringLiteral("showtbar"), true).toBool();
@@ -637,7 +660,7 @@ void MainWindow::initUI()
 
         tb->setStyleSheet(QStringLiteral("QToolBar{background: %1;}").arg(toolbgcol));
 
-        QString iconpath =
+        const QString iconpath =
             Tools::resolvePath(iconset ? TOOL_ICON0: TOOL_ICON1, false);
         auto sz = iconset ? QSize(TOOL_SIZE0, TOOL_SIZE0) : QSize(TOOL_SIZE1, TOOL_SIZE1);
         tb->setIconSize(sz);
@@ -741,7 +764,7 @@ void MainWindow::initUI()
     nb = new QTabWidget(this);
     nb->setMovable(true);
     setCentralWidget(nb);
-    nb->setFocusPolicy(Qt::StrongFocus);
+    nb->setTabPosition(QTabWidget::South);
     nb->setFocus();
 
     auto desktop = QApplication::desktop();

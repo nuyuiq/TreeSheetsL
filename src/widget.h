@@ -12,11 +12,20 @@ class Widget : public QWidget
 public:
     explicit Widget(QScrollArea *scroll);
     ~Widget();
+    QVariant inputMethodQuery(Qt::InputMethodQuery) const;
 
     void status(const QString &msg);
 
     Document *doc;
     QScrollArea *scroll;
+    int mousewheelaccum;
+    bool lastrmbwaswithctrl;
+
+protected:
+    void paintEvent(QPaintEvent *);
+    void inputMethodEvent(QInputMethodEvent *);
 };
+
+
 
 #endif // WIDGET_H

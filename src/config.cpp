@@ -37,6 +37,13 @@ void Config::write(const QString &key, const QVariant &value)
 
 void Config::reset()
 {
+    _g::deftextsize = read(QStringLiteral("defaultfontsize"), _g::deftextsize).toInt();
+#ifdef Q_OS_WIN
+    const QString &df = QStringLiteral("Lucida Sans Unicode");
+#else
+    const QString &df = QStringLiteral("Verdana");
+#endif
+    defaultfont = read(QStringLiteral("defaultfont"), df).toString();
     defaultmaxcolwidth = COLWIDTH_DEFAULTMAX;
     customcolor = 0xffffff;
     singletray = read(QStringLiteral("singletray"), false).toBool();
@@ -51,7 +58,10 @@ void Config::reset()
     autohtmlexport = read(QStringLiteral("autohtmlexport"), false).toBool();
     centered = read(QStringLiteral("centered"), true).toBool();
     fastrender = read(QStringLiteral("fastrender"), true).toBool();
+
+    pen_tinytext = 0x808080;
 }
+
 
 uint _g::celltextcolors[] = {
     0xFFFFFF,  // CUSTOM COLOR!
@@ -63,3 +73,14 @@ uint _g::celltextcolors[] = {
 };
 
 const int _g::celltextcolors_size = sizeof (_g::celltextcolors) / sizeof (_g::celltextcolors[0]);
+const int _g::grid_margin = 1;
+const int _g::cell_margin = 2;
+const int _g::margin_extra = 2;  // TODO, could make this configurable: 0/2/4/6
+const int _g::line_width = 1;
+const int _g::selmargin = 2;
+int _g::deftextsize = 12;
+int _g::mintextsize() { return _g::deftextsize - 8; }
+int _g::maxtextsize() { return _g::deftextsize + 32; }
+const int _g::grid_left_offset = 15;
+const int _g::scrollratecursor = 240;  // FIXME: must be configurable
+const int _g::scrollratewheel = 2;     // relative to 1 step on a fixed wheel usually being 120
