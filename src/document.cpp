@@ -103,8 +103,8 @@ void Document::draw(QPainter &dc)
     //dc.setBrush(QBrush(QColor(background())));
 
     if (!rootgrid) return;
-    maxx = sw->scroll->viewport()->width();
-    maxy = sw->scroll->viewport()->height();
+    maxx = sw->scrollwin->viewport()->width();
+    maxy = sw->scrollwin->viewport()->height();
 
     layout(dc);
     double xscale = maxx / (double)layoutxs;
@@ -129,7 +129,7 @@ void Document::draw(QPainter &dc)
         int drx = qMax(layoutxs, maxx);
         int dry = qMax(layoutys, maxy);
         sw->resize(drx, dry);
-        const auto &p = sw->scroll->viewport()->rect().topLeft();
+        const auto &p = sw->scrollwin->viewport()->rect().topLeft();
         originx = p.x();
         originy = p.y();
         maxx += originx;
@@ -144,13 +144,9 @@ void Document::draw(QPainter &dc)
     // sw->DoPrepareDC(dc);
     shiftToCenter(dc);
     render(dc);
-//    DrawSelect(dc, selected);
-//    if (hover.g) hover.g->DrawHover(this, dc, hover);
-//    if (scaledviewingmode) { dc.SetUserScale(1, 1); }
-
-
-
-
+    drawSelect(dc, selected);
+    if (hover.g) hover.g->drawHover(this, dc, hover);
+    if (scaledviewingmode) { dc.scale(1, 1); }
 }
 
 void Document::layout(QPainter &dc)
@@ -337,4 +333,59 @@ int Document::textSize(int depth, int relsize)
 bool Document::fontIsMini(int textsize) const
 {
     return textsize == _g::mintextsize();
+}
+
+const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool shift, bool hierarchical)
+{
+//    if (!dir) return QString();
+//    shiftToCenter(dc);
+//    if (alt)
+//    {
+//        if (!selected.g) return NoSel();
+//        if (selected.xs > 0) {
+//            // FIXME: should do undo, but this is a lot of undos that need to coalesced, same
+//            // for relsize
+//            selected.g->ResizeColWidths(dir, selected, hierarchical);
+//            selected.g->cell->ResetLayout();
+//            selected.g->cell->ResetChildren();
+//            sys->UpdateStatus(selected);
+//            Refresh();
+//            return dir > 0 ? _(L"Column width increased.") : _(L"Column width decreased.");
+//        }
+//        return L"nothing to resize";
+//    } else if (shift) {
+//        if (!selected.g) return NoSel();
+//        selected.g->cell->AddUndo(this);
+//        selected.g->ResetChildren();
+//        selected.g->RelSize(-dir, selected, pathscalebias);
+//        sys->UpdateStatus(selected);
+//        Refresh();
+//        return dir > 0 ? _(L"Text size increased.") : _(L"Text size decreased.");
+//    } else if (ctrl) {
+//        int steps = abs(dir);
+//        dir = sign(dir);
+//        loop(i, steps) Zoom(dir, dc);
+//        return dir > 0 ? _(L"Zoomed in.") : _(L"Zoomed out.");
+//    } else {
+//        ASSERT(0);
+//        return nullptr;
+//    }
+    return QString();
+}
+
+void Document::Hover(int x, int y, QPainter &dc)
+{
+//    if (redrawpending) return;
+//    shiftToCenter(dc);
+//    resetFont();
+//    Selection prev = hover;
+//    hover = Selection();
+//    auto drawroot = walkPath(drawpath);
+//    if (drawroot->grid) drawroot->grid->findXY(this, x - centerx / currentviewscale - hierarchysize,
+//                                               y - centery / currentviewscale - hierarchysize, dc);
+//    if (!(prev == hover)) {
+//        if (prev.g) prev.g->DrawHover(this, dc, prev);
+//        if (hover.g) hover.g->DrawHover(this, dc, hover);
+//    }
+//    sys->UpdateStatus(hover);
 }

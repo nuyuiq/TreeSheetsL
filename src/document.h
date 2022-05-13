@@ -23,6 +23,7 @@ struct Document
     Cell *rootgrid;
     // for use during Render() calls
     Cell *curdrawroot;
+    Selection hover;
     Selection selected;
     QVector<Selection> drawpath;
 
@@ -75,7 +76,9 @@ struct Document
     bool pickFont(QPainter &dc, int depth, int relsize, int stylebits);
     int textSize(int depth, int relsize);
     bool fontIsMini(int textsize) const;
+    const QString wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool shift, bool hierarchical = true);
     inline void refreshReset() { refresh(); }
+    void Hover(int x, int y, QPainter &dc);
 };
 
 

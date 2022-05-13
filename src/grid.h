@@ -49,6 +49,7 @@ struct Grid
     void resetChildren();
     bool layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int startx, int starty, bool forcetiny);
     void render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx, int sy, int xoff, int yoff);
+    void drawHover(Document *doc, QPainter &dc, Selection &s);
 };
 
 #endif // GRID_H

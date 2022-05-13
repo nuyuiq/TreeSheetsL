@@ -34,6 +34,8 @@
 // 默认最大列宽
 #define COLWIDTH_DEFAULTMAX 80
 
+// 滚轮的步长增量
+#define WHEELDELTA 120
 
 #endif // SYMDEF
 

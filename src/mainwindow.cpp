@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QFileSystemWatcher>
+#include <QEvent>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {

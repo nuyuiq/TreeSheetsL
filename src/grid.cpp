@@ -4,6 +4,10 @@
 #include "myapp.h"
 #include "selection.h"
 #include "tools.h"
+#include "mainwindow.h"
+#include "document.h"
+
+#include <QPainter>
 
 #define foreachcell(c)                \
     for (int y = 0; y < ys; y++)      \
@@ -287,100 +291,158 @@ bool Grid::layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int 
 
 void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx, int sy, int xoff, int yoff)
 {
-//    xoff = C(0, 0)->ox - view_margin - view_grid_outer_spacing - 1;
-//    yoff = C(0, 0)->oy - view_margin - view_grid_outer_spacing - 1;
-//    int maxx = C(xs - 1, 0)->ox + C(xs - 1, 0)->sx;
-//    int maxy = C(0, ys - 1)->oy + C(0, ys - 1)->sy;
-//    if (tinyborder || cell->drawstyle == DS_GRID) {
-//        int ldelta = view_grid_outer_spacing != 0;
-//        auto drawlines = [&]() {
-//            for (int x = ldelta; x <= xs - ldelta; x++) {
-//                int xl = (x == xs ? maxx : C(x, 0)->ox - g_line_width) + bx;
-//                if (xl >= doc->originx && xl <= doc->maxx) loop(line, g_line_width) {
-//                    dc.DrawLine(
-//                                xl + line, max(doc->originy, by + yoff + view_grid_outer_spacing),
-//                                xl + line, min(doc->maxy, by + maxy + g_line_width) + view_margin);
-//                }
-//            }
-//            for (int y = ldelta; y <= ys - ldelta; y++) {
-//                int yl = (y == ys ? maxy : C(0, y)->oy - g_line_width) + by;
-//                if (yl >= doc->originy && yl <= doc->maxy) loop(line, g_line_width) {
-//                    dc.DrawLine(max(doc->originx,
-//                                    bx + xoff + view_grid_outer_spacing + g_line_width),
-//                                yl + line, min(doc->maxx, bx + maxx) + view_margin,
-//                                yl + line);
-//                }
-//            }
-//        };
-//        if (!sys->fastrender && view_grid_outer_spacing && cell->cellcolor != 0xFFFFFF) {
-//            dc.SetPen(*wxWHITE_PEN);
-//            drawlines();
-//        }
-//        // dotted lines result in very expensive drawline calls
-//        dc.SetPen(view_grid_outer_spacing && !sys->fastrender ? sys->pen_gridlines
-//                                                              : sys->pen_tinygridlines);
-//        drawlines();
-//    }
+    xoff = C(0, 0)->ox - view_margin - view_grid_outer_spacing - 1;
+    yoff = C(0, 0)->oy - view_margin - view_grid_outer_spacing - 1;
+    int maxx = C(xs - 1, 0)->ox + C(xs - 1, 0)->sx;
+    int maxy = C(0, ys - 1)->oy + C(0, ys - 1)->sy;
+    if (tinyborder || cell->drawstyle == DS_GRID)
+    {
+        int ldelta = view_grid_outer_spacing != 0;
+        auto drawlines = [&]{
+            for (int x = ldelta; x <= xs - ldelta; x++)
+            {
+                int xl = (x == xs ? maxx : C(x, 0)->ox - _g::line_width) + bx;
+                if (xl >= doc->originx && xl <= doc->maxx)
+                {
+                    for (int line = 0; line < _g::line_width; line++)
+                    {
+                        dc.drawLine(
+                                    xl + line, qMax(doc->originy, by + yoff + view_grid_outer_spacing),
+                                    xl + line, qMin(doc->maxy, by + maxy + _g::line_width) + view_margin);
+                    }
+                }
+            }
+            for (int y = ldelta; y <= ys - ldelta; y++)
+            {
+                int yl = (y == ys ? maxy : C(0, y)->oy - _g::line_width) + by;
+                if (yl >= doc->originy && yl <= doc->maxy)
+                {
+                    for (int line = 0; line < _g::line_width; line++)
+                    {
+                        dc.drawLine(qMax(doc->originx,
+                                        bx + xoff + view_grid_outer_spacing + _g::line_width),
+                                    yl + line, qMin(doc->maxx, bx + maxx) + view_margin,
+                                    yl + line);
+                    }
+                }
+            }
+        };
+        if (!myApp.cfg->fastrender && view_grid_outer_spacing && cell->cellcolor != 0xFFFFFF)
+        {
+            dc.setPen(QColor(Qt::white));
+            drawlines();
+        }
+        // dotted lines result in very expensive drawline calls
+        dc.setPen(QColor(view_grid_outer_spacing && !myApp.cfg->fastrender ?
+                      myApp.cfg->pen_gridlines : myApp.cfg->pen_tinygridlines));
+        drawlines();
+    }
 
-//    foreachcell(c) {
-//        int cx = bx + c->ox;
-//        int cy = by + c->oy;
-//        if (cx < doc->maxx && cx + c->sx > doc->originx && cy < doc->maxy &&
-//                cy + c->sy > doc->originy) {
-//            c->Render(doc, cx, cy, dc, depth + 1, (x == 0) * view_margin,
-//                      (x == xs - 1) * view_margin, (y == 0) * view_margin,
-//                      (y == ys - 1) * view_margin, colwidths[x], cell_margin);
-//        }
-//    }
+    foreachcell(c)
+    {
+        int cx = bx + c->ox;
+        int cy = by + c->oy;
+        if (cx < doc->maxx && cx + c->sx > doc->originx && cy < doc->maxy &&
+                cy + c->sy > doc->originy)
+        {
+            c->render(doc, cx, cy, dc, depth + 1, (x == 0) * view_margin,
+                      (x == xs - 1) * view_margin, (y == 0) * view_margin,
+                      (y == ys - 1) * view_margin, colwidths[x], cell_margin);
+        }
+    }
 
-//    if (cell->drawstyle == DS_BLOBLINE && !tinyborder && cell->HasHeader() && !cell->tiny) {
-//        const int arcsize = 8;
-//        int srcy = by + cell->ycenteroff +
-//                (cell->verticaltextandgrid ? cell->tys + 2 : cell->tys / 2) + g_margin_extra;
-//        // fixme: the 8 is chosen to fit the smallest text size, not very portable
-//        int srcx = bx + (cell->verticaltextandgrid ? 8 : cell->txs + 4) + g_margin_extra;
-//        int destyfirst = -1, destylast = -1;
-//        dc.SetPen(*wxGREY_PEN);
-//        foreachcelly(c) if (c->HasContent() && !c->tiny) {
-//            int desty = c->ycenteroff + by + c->oy + c->tys / 2 + g_margin_extra;
-//            int destx = bx + c->ox - 2 + g_margin_extra;
-//            bool visible = srcx < doc->maxx && destx > doc->originx &&
-//                    desty - arcsize < doc->maxy && desty + arcsize > doc->originy;
-//            if (abs(srcy - desty) < arcsize && !cell->verticaltextandgrid) {
-//                if (destyfirst < 0) destyfirst = desty;
-//                destylast = desty;
-//                if (visible) dc.DrawLine(srcx, desty, destx, desty);
-//            } else {
-//                if (desty < srcy) {
-//                    if (destyfirst < 0) destyfirst = desty + arcsize;
-//                    destylast = desty + arcsize;
-//                    if (visible) dc.DrawBitmap(sys->frame->line_nw, srcx, desty, true);
-//                } else {
-//                    destylast = desty - arcsize;
-//                    if (visible)
-//                        dc.DrawBitmap(sys->frame->line_sw, srcx, desty - arcsize, true);
-//                    desty--;
-//                }
-//                if (visible) dc.DrawLine(srcx + arcsize, desty, destx, desty);
-//            }
-//        }
-//        if (cell->verticaltextandgrid) {
-//            if (destylast > 0) dc.DrawLine(srcx, srcy, srcx, destylast);
-//        } else {
-//            if (destyfirst >= 0 && destylast >= 0 && destyfirst < destylast) {
-//                destyfirst = min(destyfirst, srcy);
-//                destylast = max(destylast, srcy);
-//                dc.DrawLine(srcx, destyfirst, srcx, destylast);
-//            }
-//        }
+    if (cell->drawstyle == DS_BLOBLINE && !tinyborder && cell->hasHeader() && !cell->tiny)
+    {
+        const int arcsize = 8;
+        int srcy = by + cell->ycenteroff +
+                (cell->verticaltextandgrid ? cell->tys + 2 : cell->tys / 2) + _g::margin_extra;
+        // fixme: the 8 is chosen to fit the smallest text size, not very portable
+        int srcx = bx + (cell->verticaltextandgrid ? 8 : cell->txs + 4) + _g::margin_extra;
+        int destyfirst = -1, destylast = -1;
+        dc.setPen(QColor(Qt::gray));
+        foreachcelly(c) if (c->hasContent() && !c->tiny)
+        {
+            int desty = c->ycenteroff + by + c->oy + c->tys / 2 + _g::margin_extra;
+            int destx = bx + c->ox - 2 + _g::margin_extra;
+            bool visible = srcx < doc->maxx && destx > doc->originx &&
+                    desty - arcsize < doc->maxy && desty + arcsize > doc->originy;
+            if (abs(srcy - desty) < arcsize && !cell->verticaltextandgrid)
+            {
+                if (destyfirst < 0) destyfirst = desty;
+                destylast = desty;
+                if (visible) dc.drawLine(srcx, desty, destx, desty);
+            }
+            else
+            {
+                if (desty < srcy)
+                {
+                    if (destyfirst < 0) destyfirst = desty + arcsize;
+                    destylast = desty + arcsize;
+                    if (visible)
+                    {
+                        dc.drawImage(srcx, desty, myApp.frame->line_nw->display());
+                    }
+                }
+                else
+                {
+                    destylast = desty - arcsize;
+                    if (visible)
+                    {
+                        dc.drawImage(srcx, desty - arcsize, myApp.frame->line_sw->display());
+                    }
+                    desty--;
+                }
+                if (visible) dc.drawLine(srcx + arcsize, desty, destx, desty);
+            }
+        }
+        if (cell->verticaltextandgrid)
+        {
+            if (destylast > 0) dc.drawLine(srcx, srcy, srcx, destylast);
+        }
+        else
+        {
+            if (destyfirst >= 0 && destylast >= 0 && destyfirst < destylast)
+            {
+                destyfirst = qMin(destyfirst, srcy);
+                destylast = qMax(destylast, srcy);
+                dc.drawLine(srcx, destyfirst, srcx, destylast);
+            }
+        }
+    }
+    if (view_grid_outer_spacing && cell->drawstyle == DS_GRID)
+    {
+        dc.setBrush(QColor(Qt::transparent));
+        dc.setPen(QColor(bordercolor));
+        for (int i = 0; i < view_grid_outer_spacing - 1; i++)
+        {
+            QRectF rect(bx + xoff + view_grid_outer_spacing - i,
+                        by + yoff + view_grid_outer_spacing - i,
+                        maxx - xoff - view_grid_outer_spacing + 1 + i * 2 + view_margin,
+                        maxy - yoff - view_grid_outer_spacing + 1 + i * 2 + view_margin);
+            dc.drawRoundedRect(rect, myApp.cfg->roundness, myApp.cfg->roundness, Qt::AbsoluteSize);
+        }
+    }
+}
+
+void Grid::drawHover(Document *doc, QPainter &dc, Selection &s)
+{
+    // TODO
+//#ifndef SIMPLERENDER
+//#ifdef __WXMAC__
+//    const uint thincol = 0xFFFFFF;
+//    const uint bgcol = 0xFFFFFF;
+//#else
+//    const uint thincol = 0x555555;
+//    const uint bgcol = 0x101014;
+//#endif
+//    dc.SetLogicalFunction(wxXOR);
+//    if (s.Thin()) {
+//        DrawInsert(doc, dc, s, thincol);
+//    } else {
+//        Cell *c = C(s.x, s.y);
+//        DrawRectangle(dc, bgcol, c->GetX(doc) - cell_margin, c->GetY(doc) - cell_margin,
+//                      c->sx + cell_margin * 2, c->sy + cell_margin * 2);
 //    }
-//    if (view_grid_outer_spacing && cell->drawstyle == DS_GRID) {
-//        dc.SetBrush(*wxTRANSPARENT_BRUSH);
-//        dc.SetPen(wxPen(wxColour(bordercolor)));
-//        loop(i, view_grid_outer_spacing - 1) dc.DrawRoundedRectangle(
-//                    bx + xoff + view_grid_outer_spacing - i, by + yoff + view_grid_outer_spacing - i,
-//                    maxx - xoff - view_grid_outer_spacing + 1 + i * 2 + view_margin,
-//                    maxy - yoff - view_grid_outer_spacing + 1 + i * 2 + view_margin,
-//                    sys->roundness + i);
-//    }
+//    dc.SetLogicalFunction(wxCOPY);
+//#endif
 }

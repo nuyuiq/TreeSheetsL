@@ -9,6 +9,7 @@ struct Document;
 class Widget : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit Widget(QScrollArea *scroll);
     ~Widget();
@@ -17,13 +18,17 @@ public:
     void status(const QString &msg);
 
     Document *doc;
-    QScrollArea *scroll;
-    int mousewheelaccum;
+    QScrollArea *scrollwin;
     bool lastrmbwaswithctrl;
 
+    void updateHover(int mx, int my, QPainter &dc);
+
+    void cursorScroll(int dx, int dy);
 protected:
     void paintEvent(QPaintEvent *);
     void inputMethodEvent(QInputMethodEvent *);
+    void wheelEvent(QWheelEvent *);
+
 };
 
 

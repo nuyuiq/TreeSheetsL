@@ -222,6 +222,8 @@ struct CfgCache {
     int customcolor;
     int defaultmaxcolwidth;
     uint pen_tinytext;
+    uint pen_tinygridlines;
+    uint pen_gridlines;
     bool singletray;
     bool minclose;
     bool totray;
