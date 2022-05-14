@@ -1,6 +1,7 @@
 #include "dropdown.h"
 #include "config.h"
 #include "myapp.h"
+#include "tools.h"
 
 #include <QDebug>
 #include <QAbstractItemDelegate>
@@ -8,9 +9,9 @@
 #include <QDir>
 #include <QPixmap>
 
-static QColor getColor(int idx)
+static Color getColor(int idx)
 {
-    return QColor(idx == CUSTOMCOLORIDX?
+    return Color(idx == CUSTOMCOLORIDX?
                       myApp.cfg->customcolor:
                       _g::celltextcolors[idx]);
 }
@@ -78,7 +79,7 @@ ColorDropdown::ColorDropdown(
 //    });
 }
 
-QColor ColorDropdown::currentColor() const
+Color ColorDropdown::currentColor() const
 {
     return getColor(currentIndex());
 }

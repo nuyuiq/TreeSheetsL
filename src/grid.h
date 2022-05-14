@@ -48,8 +48,10 @@ struct Grid
     int minRelsize(int rs);
     void resetChildren();
     bool layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int startx, int starty, bool forcetiny);
-    void render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx, int sy, int xoff, int yoff);
+    void render(Document *doc, int bx, int by, QPainter &dc, int depth);
     void drawHover(Document *doc, QPainter &dc, Selection &s);
+    void drawInsert(Document *doc, QPainter &dc, Selection &s, uint colour);
+    void findXY(Document *doc, int px, int py, QPainter &dc);
 };
 
 #endif // GRID_H

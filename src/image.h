@@ -50,7 +50,7 @@ struct Image {
 
     QImage &display()
     {
-        if (!bm_display.isNull())
+        if (bm_display.isNull())
         {
             bm_display = scaleImg(bm_orig, 1.0 / display_scale);
             // TODO

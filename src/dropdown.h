@@ -2,12 +2,13 @@
 #define DROPDOWN_H
 
 #include <QComboBox>
+class Color;
 
 class ColorDropdown : public QComboBox
 {
 public:
     explicit ColorDropdown(int sel, int width, int msc, QWidget *parent = nullptr);
-    QColor currentColor() const;
+    Color currentColor() const;
 
 protected:
     void paintEvent(QPaintEvent *);

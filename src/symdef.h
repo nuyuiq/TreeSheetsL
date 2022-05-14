@@ -19,7 +19,7 @@
 // 图标
 #define ICON_FILEPATH "/icon16.png"
 
-// 工具条/状态栏背景色
+// 工具条/状态栏背景色    // RGB
 #define TOOL_BGCOLOR0 "#E8ECF0"
 #define TOOL_BGCOLOR1 "#BCC7D8"
 

@@ -24,11 +24,19 @@ public:
     void updateHover(int mx, int my, QPainter &dc);
 
     void cursorScroll(int dx, int dy);
+    void selectClick(int mx, int my, bool right, int isctrlshift);
 protected:
     void paintEvent(QPaintEvent *);
     void inputMethodEvent(QInputMethodEvent *);
     void wheelEvent(QWheelEvent *);
+    void mousePressEvent(QMouseEvent *);
+    void mouseReleaseEvent(QMouseEvent *);
+    void mouseMoveEvent(QMouseEvent *);
+    void mouseDoubleClickEvent(QMouseEvent *);
+    void contextMenuEvent(QContextMenuEvent *);
 
+private:
+    QPoint lastmousepos;
 };
 
 

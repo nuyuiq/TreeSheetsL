@@ -62,6 +62,7 @@ void Config::reset()
     pen_tinytext = 0x808080;
     pen_tinygridlines = 0xf2dcd8;
     pen_gridlines = 0xe5b7b0;
+    pen_thinselect = 0xc0c0c0;
 }
 
 

@@ -13,6 +13,7 @@ class ColorDropdown;
 class ImageDropdown;
 class QFileSystemWatcher;
 class QLabel;
+class Selection;
 
 class MainWindow : public QMainWindow
 {
@@ -38,6 +39,8 @@ public:
             bool general = true,
             int status=-1,
             QActionGroup *group=nullptr);
+    //! 更新选中状态在状态栏
+    void updateStatus(const Selection &s);
 
     ImagePtr foldicon;
     ImagePtr line_nw;

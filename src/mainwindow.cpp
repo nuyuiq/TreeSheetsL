@@ -7,6 +7,8 @@
 #include "dropdown.h"
 #include "history.h"
 #include "document.h"
+#include "cell.h"
+#include "grid.h"
 
 #include <QScrollArea>
 #include <QIcon>
@@ -112,6 +114,16 @@ void MainWindow::appendSubMenu(
     if (general) myApp.cfg->menuShortcutMap.insert(item, key);
 }
 
+void MainWindow::updateStatus(const Selection &s)
+{
+    if (!sbl[1]) return;
+    Cell *c = s.getCell();
+    if (!(c && s.xs)) return;
+    sbl[3]->setText(tr("Size %1").arg(-c->text.relsize));
+    sbl[2]->setText(tr("Width %1").arg(s.g->colwidths[s.x]));
+    sbl[1]->setText(tr("Edited %1").arg(c->text.lastedit.toString(Qt::SystemLocaleShortDate)));
+}
+
 void MainWindow::fileChangeWatch(const QString &file)
 {
     watcher->addPath(file);
@@ -195,7 +207,7 @@ void MainWindow::initUI()
         p =  Tools::resolvePath(QStringLiteral("images/render/line_nw.png"), true);
         if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1 / 3));
         p =  Tools::resolvePath(QStringLiteral("images/render/line_sw.png"), true);
-        if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1 / 3));
+        if (!p.isEmpty()) line_sw = ImagePtr(new Image(QImage(p), 1 / 3));
     }
 
     bool mergetbar = myApp.cfg->read(QStringLiteral("mergetbar"), true).toBool();
@@ -825,7 +837,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
     QMainWindow::closeEvent(event);
 }
-
 
 void MainWindow::timerEvent(QTimerEvent *event)
 {

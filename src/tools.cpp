@@ -116,9 +116,19 @@ double Tools::DataIO::readDouble()
 
 void Tools::drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline)
 {
-    const QColor qcolor(color);
+    const Color qcolor(color);
     if (outline) dc.setBrush(QBrush(Qt::transparent));
     else dc.setBrush(QBrush(qcolor));
     dc.setPen(QPen(qcolor));
-    dc.drawRect(x, y, xs, ys);
+    dc.drawRect(x, y, xs - 1, ys - 1);
+}
+
+
+void Tools::drawRoundedRect(QPainter &dc, uint color, int roundness, int x, int y, int xs, int ys)
+{
+    const Color qcolor(color);
+    dc.setBrush(QBrush(qcolor));
+    dc.setPen(QPen(qcolor));
+    const QRect rect(x, y, xs - 1, ys - 1);
+    dc.drawRoundedRect(rect, roundness, roundness, Qt::AbsoluteSize);
 }

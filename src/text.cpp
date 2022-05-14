@@ -10,6 +10,7 @@
 
 #include <QVariantMap>
 #include <QPainter>
+#include <QDebug>
 
 void Text::load(Tools::DataIO &dis, QVariantMap &info)
 {
@@ -225,7 +226,7 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
     doc->pickFont(dc, depth, relsize, stylebits);
 
     // TODO
-    int h = cell->tiny ? 1 : dc.fontMetrics().xHeight();
+    int h = cell->tiny ? 1 : dc.fontMetrics().height();
     leftoffset = h;
     int i = 0;
     int lines = 0;
@@ -235,8 +236,9 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
     if (searchfound) dc.setPen(QColor(Qt::red));
     else if (filtered) dc.setPen(QColor(Qt::lightGray));
     else if (istag) dc.setPen(QColor(Qt::blue));
-    else if (cell->tiny) dc.setPen(QColor(myApp.cfg->pen_tinytext));
-    else if (cell->textcolor) dc.setPen(QColor(cell->textcolor)); // FIXME: clean up
+    else if (cell->tiny) dc.setPen(Color(myApp.cfg->pen_tinytext));
+    else if (cell->textcolor) dc.setPen(Color(cell->textcolor)); // FIXME: clean up
+    else dc.setPen(QColor(Qt::black));
 
     forever
     {
@@ -247,10 +249,6 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
             if (myApp.cfg->fastrender)
             {
                 dc.drawLine(bx + ixs, by + lines * h, bx + ixs + curl.length(), by + lines * h);
-                /*
-                        wxPoint points[] = { wxPoint(bx + ixs, by + lines * h), wxPoint(bx + ixs + curl.Len(), by + lines * h) };
-                        dc.DrawLines(1, points, 0, 0);
-                         */
             }
             else
             {
@@ -275,11 +273,41 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
             int tx = bx + 2 + ixs;
             int ty = by + lines * h;
             myDrawText(dc, curl, tx + _g::margin_extra, ty + _g::margin_extra, cell->sx, h);
-            if (searchfound || filtered || istag || cell->textcolor)
-                dc.setPen(QColor(Qt::black));
         }
         lines++;
     }
 
     return qMax(lines * h, iys);
+}
+
+void Text::findCursor(Document *doc, int bx, int by, QPainter &dc, Selection &s, int maxcolwidth)
+{
+    bx -= _g::margin_extra;
+    by -= _g::margin_extra;
+
+    int ixs = 0, iys = 0;
+    if (!cell->tiny) disImgSize(ixs, iys);
+    if (ixs) ixs += 2;
+
+    doc->pickFont(dc, cell->depth() - doc->drawpath.size(), relsize, stylebits);
+
+    int i = 0, linestart = 0;
+    int line = by / dc.fontMetrics().height();
+    QString ls;
+
+    for (int l = 0; l < line + 1; l++)
+    {
+        linestart = i;
+        ls = getLine(i, maxcolwidth);
+    }
+
+    forever
+    {
+        const QSize &s = dc.fontMetrics().size(Qt::TextSingleLine, ls);
+        if (s.width() <= bx - ixs + 2 || !s.width()) break;
+        ls.resize(ls.length() - 1);
+    }
+
+    s.cursor = s.cursorend = linestart + ls.length();
+    Q_ASSERT(s.cursor >= 0 && s.cursor <= t.length());
 }

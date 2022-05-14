@@ -18,7 +18,7 @@ MyLog::MyLog()
     oldHandler = qInstallMessageHandler(msgOutput);
     const QString &pattern =
         #ifdef QT_DEBUG
-            QStringLiteral("[%{time mm:ss.zzz} %{if-debug}D%{endif}%{if-info}I%{endif}%{if-warning}W%{endif}%{if-critical}C%{endif}%{if-fatal}F%{endif}] %{file}:%{line} -- %{message}");
+            QStringLiteral("[%{time mm:ss.zzz} %{if-debug}D%{endif}%{if-info}I%{endif}%{if-warning}W%{endif}%{if-critical}C%{endif}%{if-fatal}F%{endif}] %{file}:%{line} %{function} -- %{message}");
         #else
             QStringLiteral("[%{time mm:ss.zzz} %{if-debug}D%{endif}%{if-info}I%{endif}%{if-warning}W%{endif}%{if-critical}C%{endif}%{if-fatal}F%{endif}] -- %{message}");
         #endif

@@ -6,6 +6,7 @@
 #include "cell.h"
 #include "widget.h"
 #include "config.h"
+#include "widget.h"
 
 #include <QFileInfo>
 #include <QPainter>
@@ -23,6 +24,7 @@ Document::Document(Widget *sw)
     redrawpending = false;
     while_printing = false;
     scaledviewingmode = false;
+    fgutter = 6;
 }
 
 Document::~Document()
@@ -99,8 +101,7 @@ void Document::drawSelectMove(QPainter &dc, Selection &s, bool refreshalways, bo
 void Document::draw(QPainter &dc)
 {
     redrawpending = false;
-    //dc.setBackground();
-    //dc.setBrush(QBrush(QColor(background())));
+    dc.fillRect(dc.clipBoundingRect(), Color(background()));
 
     if (!rootgrid) return;
     maxx = sw->scrollwin->viewport()->width();
@@ -129,20 +130,26 @@ void Document::draw(QPainter &dc)
         int drx = qMax(layoutxs, maxx);
         int dry = qMax(layoutys, maxy);
         sw->resize(drx, dry);
-        const auto &p = sw->scrollwin->viewport()->rect().topLeft();
-        originx = p.x();
-        originy = p.y();
-        maxx += originx;
-        maxy += originy;
+        const auto &p = sw->pos();
+        const auto &cur = QRect(-p.x(), -p.y(), maxx, maxy);
+        cur.getCoords(&originx, &originy, &maxx, &maxy);
     }
+
     centerx = myApp.cfg->centered && !originx && maxx > layoutxs
                   ? (maxx - layoutxs) / 2 * currentviewscale
                   : 0;
     centery = myApp.cfg->centered && !originy && maxy > layoutys
                   ? (maxy - layoutys) / 2 * currentviewscale
                   : 0;
-    // sw->DoPrepareDC(dc);
+
+    // TODO
+    auto roi = dc.clipBoundingRect().toRect() & QRect(originx, originy, maxx, maxy);
+    if (roi.width() == 0 || roi.height() == 0) return;
+    roi.getCoords(&originx, &originy, &maxx, &maxy);
+
     shiftToCenter(dc);
+
+
     render(dc);
     drawSelect(dc, selected);
     if (hover.g) hover.g->drawHover(this, dc, hover);
@@ -163,8 +170,7 @@ void Document::layout(QPainter &dc)
     hierarchysize = 0;
     for (Cell *p = curdrawroot->p; p; p = p->p)
     {
-        // TODO xHeight or height
-        if (p->text.t.length()) hierarchysize += dc.fontMetrics().xHeight();
+        if (p->text.t.length()) hierarchysize += dc.fontMetrics().height();
     }
     hierarchysize += fgutter;
     layoutxs = curdrawroot->sx + hierarchysize + fgutter;
@@ -173,16 +179,9 @@ void Document::layout(QPainter &dc)
 
 void Document::shiftToCenter(QPainter &dc)
 {
-    // ?? ==
-    dc.translate(centerx, centery);
+    const auto &ps = dc.viewport().topLeft();
+    dc.translate(ps.x() > 0? -ps.x(): centerx, ps.y() > 0? ps.y(): centery);
     dc.scale(currentviewscale, currentviewscale);
-    dc.translate(-centerx, centery);
-
-    // TODO
-//    int dlx = dc.DeviceToLogicalX(0);
-//    int dly = dc.DeviceToLogicalY(0);
-//    dc.SetDeviceOrigin(dlx > 0 ? -dlx : centerx, dly > 0 ? -dly : centery);
-//    dc.scale(currentviewscale, currentviewscale);
 }
 
 void Document::render(QPainter &dc)
@@ -197,8 +196,7 @@ void Document::render(QPainter &dc)
     {
         if (p->text.t.length())
         {
-            // TODO
-            int off = hierarchysize - dc.fontMetrics().xHeight() * ++i;
+            int off = hierarchysize - dc.fontMetrics().height() * ++i;
             QString s = p->text.t;
             if (s.length() > myApp.cfg->defaultmaxcolwidth)
             {
@@ -217,8 +215,8 @@ void Document::render(QPainter &dc)
 
 void Document::refresh()
 {
-    //    hover.g = nullptr;
-    //    RefreshHover();
+    hover.g = nullptr;
+    refreshHover();
 }
 
 void Document::resetFont()
@@ -375,17 +373,89 @@ const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool s
 
 void Document::Hover(int x, int y, QPainter &dc)
 {
-//    if (redrawpending) return;
-//    shiftToCenter(dc);
-//    resetFont();
-//    Selection prev = hover;
-//    hover = Selection();
-//    auto drawroot = walkPath(drawpath);
-//    if (drawroot->grid) drawroot->grid->findXY(this, x - centerx / currentviewscale - hierarchysize,
-//                                               y - centery / currentviewscale - hierarchysize, dc);
-//    if (!(prev == hover)) {
-//        if (prev.g) prev.g->DrawHover(this, dc, prev);
-//        if (hover.g) hover.g->DrawHover(this, dc, hover);
+    if (redrawpending) return;
+    shiftToCenter(dc);
+    resetFont();
+    Selection prev = hover;
+    hover = Selection();
+    auto drawroot = walkPath(drawpath);
+    if (drawroot->grid) drawroot->grid->findXY(this, x - centerx / currentviewscale - hierarchysize,
+                                               y - centery / currentviewscale - hierarchysize, dc);
+    if (!(prev == hover))
+    {
+        if (prev.g) prev.g->drawHover(this, dc, prev);
+        if (hover.g) hover.g->drawHover(this, dc, hover);
+    }
+    myApp.frame->updateStatus(hover);
+}
+
+void Document::select(QPainter &dc, bool right, int isctrlshift)
+{
+//    begindrag = Selection();
+//    if (right && hover.IsInside(selected)) return;
+//    ShiftToCenter(dc);
+//    DrawSelect(dc, selected);
+//    if (selected.GetCell() == hover.GetCell() && hover.GetCell()) hover.EnterEditOnly(this);
+//    selected = hover;
+//    begindrag = hover;
+//    isctrlshiftdrag = isctrlshift;
+//    DrawSelectMove(dc, selected);
+//    ResetCursor();
+//    return;
+}
+
+void Document::selectUp()
+{
+//    if (!isctrlshiftdrag || isctrlshiftdrag == 3 || begindrag.EqLoc(selected)) return;
+//    Cell *c = selected.GetCell();
+//    if (!c) return;
+//    Cell *tc = begindrag.ThinExpand(this);
+//    selected = begindrag;
+//    if (tc) {
+//        auto is_parent = tc->IsParentOf(c);
+//        auto tc_parent = tc->parent;  // tc may be deleted.
+//        tc->Paste(this, c, begindrag);
+//        // If is_parent, c has been deleted already.
+//        if (isctrlshiftdrag == 1 && !is_parent) {
+//            c->parent->AddUndo(this);
+//            Selection cs = c->parent->grid->FindCell(c);
+//            c->parent->grid->MultiCellDeleteSub(this, cs);
+//        }
+//        hover = selected = tc_parent ? tc_parent->grid->FindCell(tc) : Selection();
 //    }
-//    sys->UpdateStatus(hover);
+//    refresh();
+}
+
+const QString Document::doubleClick(QPainter &dc)
+{
+    if (!selected.g) return QString();
+    shiftToCenter(dc);
+    Cell *c = selected.getCell();
+    if (selected.thin())
+    {
+        selected.selAll();
+        refresh();
+    }
+    else if (c)
+    {
+        drawSelect(dc, selected);
+        if (selected.textEdit()) {
+            c->text.selectWord(selected);
+            begindrag = selected;
+        }
+        else
+        {
+            selected.enterEditOnly(this);
+        }
+        drawSelect(dc, selected, true);
+    }
+    return QString();
+}
+
+void Document::refreshHover()
+{
+    redrawpending = true;
+    // if (sw) sw->update();
+    myApp.frame->updateStatus(selected);
+    myApp.frame->nb->update();
 }

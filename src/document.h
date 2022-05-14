@@ -25,6 +25,7 @@ struct Document
     Cell *curdrawroot;
     Selection hover;
     Selection selected;
+    Selection begindrag;
     QVector<Selection> drawpath;
 
     double currentviewscale;
@@ -77,8 +78,13 @@ struct Document
     int textSize(int depth, int relsize);
     bool fontIsMini(int textsize) const;
     const QString wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool shift, bool hierarchical = true);
-    inline void refreshReset() { refresh(); }
     void Hover(int x, int y, QPainter &dc);
+    void select(QPainter &dc, bool right, int isctrlshift);
+    void selectUp();
+    const QString doubleClick(QPainter &dc);
+    void refreshHover();
+    inline void refreshReset() { refresh(); }
+
 };
 
 

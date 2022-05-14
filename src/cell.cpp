@@ -6,6 +6,7 @@
 #include "document.h"
 
 #include <QPainter>
+#include <QDebug>
 
 Cell::Cell(Cell *_p, const Cell *_clonefrom, quint8 _ct, Grid *_g)
 {
@@ -172,9 +173,7 @@ void Cell::layout(Document *doc, QPainter &dc, int depth, int maxcolwidth, bool 
     tiny = (text.filtered && !grid) || forcetiny ||
             doc->pickFont(dc, depth, text.relsize, text.stylebits);
 
-    // TODO or
-    int charHeight = dc.fontMetrics().xHeight();
-    // int charHeight = dc.fontMetrics().height();
+    int charHeight = dc.fontMetrics().height();
 
     int ixs = 0, iys = 0;
     if (!tiny) text.disImgSize(ixs, iys);
@@ -259,29 +258,34 @@ void Cell::render(Document *doc, int bx, int by, QPainter &dc, int depth, int ml
                 cp[i] = cp[i] * 850 / 1000;
             }
         }
-        dc.setBrush(QBrush(QColor(actualcellcolor)));
-        dc.setPen(QPen(QColor(actualcellcolor)));
-
         if (drawstyle == DS_BLOBSHIER)
         {
-            QRectF rect(bx - cell_margin, by - cell_margin, minx + cell_margin * 2, miny + cell_margin * 2);
-            dc.drawRoundedRect(rect, myApp.cfg->roundness, myApp.cfg->roundness, Qt::AbsoluteSize);
+            Tools::drawRoundedRect(dc, actualcellcolor, myApp.cfg->roundness,
+                                   bx - cell_margin, by - cell_margin,
+                                   minx + cell_margin * 2, miny + cell_margin * 2);
         }
         else if (hasHeader())
         {
-            QRectF rect(bx - cell_margin + _g::margin_extra / 2,
-                        by - cell_margin + ycenteroff + _g::margin_extra / 2,
-                        txs + cell_margin * 2 + _g::margin_extra,
-                        tys + cell_margin * 2 + _g::margin_extra);
-            dc.drawRoundedRect(rect, myApp.cfg->roundness, myApp.cfg->roundness, Qt::AbsoluteSize);
+            Tools::drawRoundedRect(dc, actualcellcolor, myApp.cfg->roundness,
+                                   bx - cell_margin + _g::margin_extra / 2,
+                                   by - cell_margin + ycenteroff + _g::margin_extra / 2,
+                                   txs + cell_margin * 2 + _g::margin_extra,
+                                   tys + cell_margin * 2 + _g::margin_extra);
         }
         // FIXME: this half a g_margin_extra is a bit of hack
     }
 
-    //dc.SetTextBackground(wxColour(actualcellcolor));
-    // TODO
-    int xoff = verticaltextandgrid ? 0 : text.extent - depth * dc.fontMetrics().xHeight();
-    int yoff = text.render(doc, bx, by + ycenteroff, depth, dc, xoff, maxcolwidth);
-    yoff = verticaltextandgrid ? yoff : 0;
-    if (gridShown(doc)) grid->render(doc, bx, by, dc, depth, sx - xoff, sy - yoff, xoff, yoff);
+    int xoff = verticaltextandgrid ? 0 : text.extent - depth * dc.fontMetrics().height();
+    /*int yoff = */text.render(doc, bx, by + ycenteroff, depth, dc, xoff, maxcolwidth);
+    if (gridShown(doc)) grid->render(doc, bx, by, dc, depth);
+}
+
+int Cell::getX(Document *doc) const
+{
+    return ox + (p ? p->getX(doc) : doc->hierarchysize);
+}
+
+int Cell::getY(Document *doc) const
+{
+    return oy + (p ? p->getY(doc) : doc->hierarchysize);
 }

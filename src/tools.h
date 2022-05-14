@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QIODevice>
+#include <QColor>
 
 class QPainter;
 
@@ -18,7 +19,7 @@ QString tmpName(const QString &filename);
 QString extName(const QString &filename, const QString &ext);
 
 void drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline = false);
-
+void drawRoundedRect(QPainter &dc, uint color, int roundness, int x, int y, int xs, int ys);
 
 
 class DataIO
@@ -60,8 +61,15 @@ public:
 
 };
 
-
 }
+
+//! 由于原系统项目环境使用的颜色编码为 BGR ，需要转换为 RGB
+class Color : public QColor
+{
+public:
+    inline Color(uint bgr): QColor(uchar(bgr), uchar(bgr>>8), uchar(bgr>>16)) { }
+    inline uint toBGR() const { return blue() * 256 * 256 + green() * 256 + red(); }
+};
 
 #define DELPTR(p) ({if (p) {delete p; p = nullptr;}})
 

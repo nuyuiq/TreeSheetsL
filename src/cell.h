@@ -72,6 +72,8 @@ struct Cell
     void reset();
     void resetChildren();
     bool isTag(Document *doc) const;
+    int getX(Document *doc) const;
+    int getY(Document *doc) const;
     // the smallest relsize is actually the biggest text
     int minRelsize();
     bool gridShown(Document *doc) const;
@@ -84,6 +86,8 @@ struct Cell
     inline bool hasTextState() const { return hasTextSize() || text.image.data(); }
     inline bool hasHeader() const { return hasText() || text.image.data(); }
     inline bool hasContent() const { return hasHeader() || grid; }
+    inline bool isInside(int x, int y) const { return x >= 0 && y >= 0 && x < sx && y < sy; }
+
 
     static Cell*loadWhich(Tools::DataIO &dis, Cell *parent, int &numcells, int &textbytes, QVariantMap &info);
 };

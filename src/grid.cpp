@@ -6,8 +6,10 @@
 #include "tools.h"
 #include "mainwindow.h"
 #include "document.h"
+#include "widget.h"
 
 #include <QPainter>
+#include <QDebug>
 
 #define foreachcell(c)                \
     for (int y = 0; y < ys; y++)      \
@@ -252,6 +254,7 @@ bool Grid::layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int 
             tinyborder || cell->drawstyle != DS_GRID ? 0 : user_grid_outer_spacing;
     view_margin = tinyborder || cell->drawstyle != DS_GRID ? 0 : _g::grid_margin;
     cell_margin = tinyborder ? 0 : (cell->drawstyle == DS_GRID ? 0 : _g::cell_margin);
+
     sx = (xs + 1) * _g::line_width + xs * cell_margin * 2 +
             2 * (view_grid_outer_spacing + view_margin) + startx;
     sy = (ys + 1) * _g::line_width + ys * cell_margin * 2 +
@@ -289,10 +292,10 @@ bool Grid::layout(Document *doc, QPainter &dc, int depth, int &sx, int &sy, int 
     return tinyborder;
 }
 
-void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx, int sy, int xoff, int yoff)
+void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
 {
-    xoff = C(0, 0)->ox - view_margin - view_grid_outer_spacing - 1;
-    yoff = C(0, 0)->oy - view_margin - view_grid_outer_spacing - 1;
+    int xoff = C(0, 0)->ox - view_margin - view_grid_outer_spacing - 1;
+    int yoff = C(0, 0)->oy - view_margin - view_grid_outer_spacing - 1;
     int maxx = C(xs - 1, 0)->ox + C(xs - 1, 0)->sx;
     int maxy = C(0, ys - 1)->oy + C(0, ys - 1)->sy;
     if (tinyborder || cell->drawstyle == DS_GRID)
@@ -333,7 +336,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx
             drawlines();
         }
         // dotted lines result in very expensive drawline calls
-        dc.setPen(QColor(view_grid_outer_spacing && !myApp.cfg->fastrender ?
+        dc.setPen(Color(view_grid_outer_spacing && !myApp.cfg->fastrender ?
                       myApp.cfg->pen_gridlines : myApp.cfg->pen_tinygridlines));
         drawlines();
     }
@@ -378,7 +381,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx
                 {
                     if (destyfirst < 0) destyfirst = desty + arcsize;
                     destylast = desty + arcsize;
-                    if (visible)
+                    if (visible && !!myApp.frame->line_nw)
                     {
                         dc.drawImage(srcx, desty, myApp.frame->line_nw->display());
                     }
@@ -386,7 +389,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx
                 else
                 {
                     destylast = desty - arcsize;
-                    if (visible)
+                    if (visible && !!myApp.frame->line_sw)
                     {
                         dc.drawImage(srcx, desty - arcsize, myApp.frame->line_sw->display());
                     }
@@ -412,7 +415,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx
     if (view_grid_outer_spacing && cell->drawstyle == DS_GRID)
     {
         dc.setBrush(QColor(Qt::transparent));
-        dc.setPen(QColor(bordercolor));
+        dc.setPen(Color(bordercolor));
         for (int i = 0; i < view_grid_outer_spacing - 1; i++)
         {
             QRectF rect(bx + xoff + view_grid_outer_spacing - i,
@@ -426,23 +429,137 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth, int sx
 
 void Grid::drawHover(Document *doc, QPainter &dc, Selection &s)
 {
-    // TODO
-//#ifndef SIMPLERENDER
-//#ifdef __WXMAC__
-//    const uint thincol = 0xFFFFFF;
-//    const uint bgcol = 0xFFFFFF;
-//#else
-//    const uint thincol = 0x555555;
-//    const uint bgcol = 0x101014;
-//#endif
-//    dc.SetLogicalFunction(wxXOR);
-//    if (s.Thin()) {
-//        DrawInsert(doc, dc, s, thincol);
-//    } else {
-//        Cell *c = C(s.x, s.y);
-//        DrawRectangle(dc, bgcol, c->GetX(doc) - cell_margin, c->GetY(doc) - cell_margin,
-//                      c->sx + cell_margin * 2, c->sy + cell_margin * 2);
-//    }
-//    dc.SetLogicalFunction(wxCOPY);
-//#endif
+#ifndef SIMPLERENDER
+    QRect rect;
+    const bool thin = s.thin();
+    if (!thin)
+    {
+        const Cell *c = C(s.x, s.y);
+        rect = QRect(c->getX(doc) - cell_margin,
+                                c->getY(doc) - cell_margin,
+                                c->sx + cell_margin * 2,
+                                c->sy + cell_margin * 2);
+        if (!dc.hasClipping())
+        {
+            doc->sw->update(dc.transform().mapRect(rect));
+            return;
+        }
+    }
+
+#ifdef Q_OS_MAC
+    const uint thincol = 0xFFFFFF;
+    const uint bgcol = 0xFFFFFF;
+#else
+    const uint thincol = 0x555555;
+    const uint bgcol = 0x101014;
+#endif
+    auto old = dc.compositionMode();
+    dc.setCompositionMode(QPainter::RasterOp_SourceXorDestination);
+    if (thin)
+    {
+        drawInsert(doc, dc, s, thincol);
+    }
+    else
+    {
+        Tools::drawRect(dc, bgcol, rect.x(), rect.y(), rect.width(), rect.height());
+    }
+    dc.setCompositionMode(old);
+#endif
+}
+
+void Grid::drawInsert(Document *doc, QPainter &dc, Selection &s, uint colour)
+{
+    QVector<QRect> lines(_g::line_width);
+    QRect bline;
+    if (!s.xs)
+    {
+        Cell *c = C(s.x - (s.x == xs), s.y);
+        int x = c->getX(doc) + (c->sx + _g::line_width + cell_margin) * (s.x == xs) -
+                _g::line_width - cell_margin;
+        int y1 = qMax(cell->getY(doc), doc->originy);
+        int y2 = qMin(cell->getY(doc) + cell->sy, doc->maxy);
+        for (int line = 0; line < _g::line_width; line++)
+        {
+            lines[line].setCoords(x + line, y1, x + line, y2);
+        }
+        bline.setRect(x - 1, c->getY(doc), _g::line_width + 2, c->sy);
+
+    }
+    else
+    {
+        Cell *c = C(s.x, s.y - (s.y == ys));
+        int y = c->getY(doc) + (c->sy + _g::line_width + cell_margin) * (s.y == ys) -
+                _g::line_width - cell_margin;
+        int x1 = qMax(cell->getX(doc), doc->originx);
+        int x2 = qMin(cell->getX(doc) + cell->sx, doc->maxx);
+        for (int line = 0; line < _g::line_width; line++)
+        {
+            lines[line].setCoords(x1, y + line, x2, y + line);
+        }
+        bline.setRect(c->getX(doc), y - 1, c->sx, _g::line_width + 2);
+    }
+    if (dc.hasClipping())
+    {
+        QPen pen(dc.pen());
+        pen.setColor(Color(myApp.cfg->pen_thinselect));
+        pen.setStyle(Qt::CustomDashLine);
+        pen.setDashPattern(QVector<qreal>() << 2 << 4);
+        dc.setPen(pen);
+        foreach (const QRect &line, qAsConst(lines))
+        {
+            dc.drawLine(line.left(), line.top(), line.right(), line.bottom());
+        }
+        Tools::drawRect(dc, colour, bline.x(), bline.y(), bline.width(), bline.height());
+    }
+    else
+    {
+        foreach (const QRect &line, qAsConst(lines))
+        {
+            bline |= line;
+        }
+        auto rr = dc.transform().mapRect(bline);
+        doc->sw->update(rr);
+    }
+}
+
+void Grid::findXY(Document *doc, int px, int py, QPainter &dc)
+{
+    foreachcell(c)
+    {
+        int bx = px - c->ox;
+        int by = py - c->oy;
+        if (bx >= 0 && by >= -_g::line_width - _g::selmargin && bx < c->sx && by < _g::selmargin)
+        {
+            doc->hover = Selection(this, x, y, 1, 0);
+            return;
+        }
+        if (bx >= 0 && by >= c->sy - _g::selmargin && bx < c->sx &&
+                by < c->sy + _g::line_width + _g::selmargin)
+        {
+            doc->hover = Selection(this, x, y + 1, 1, 0);
+            return;
+        }
+        if (bx >= -_g::line_width - _g::selmargin && by >= 0 && bx < _g::selmargin && by < c->sy)
+        {
+            doc->hover = Selection(this, x, y, 0, 1);
+            return;
+        }
+        if (bx >= c->sx - _g::selmargin && by >= 0 && bx < c->sx + _g::line_width + _g::selmargin &&
+                by < c->sy)
+        {
+            doc->hover = Selection(this, x + 1, y, 0, 1);
+            return;
+        }
+        if (c->isInside(bx, by))
+        {
+            if (c->gridShown(doc)) c->grid->findXY(doc, bx, by, dc);
+            if (doc->hover.g) return;
+            doc->hover = Selection(this, x, y, 1, 1);
+            if (c->hasText())
+            {
+                c->text.findCursor(doc, bx, by - c->ycenteroff, dc, doc->hover, colwidths[x]);
+            }
+            return;
+        }
+    }
 }

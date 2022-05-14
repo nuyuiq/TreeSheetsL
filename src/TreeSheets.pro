@@ -48,7 +48,7 @@ FORMS +=
 DESTDIR = $$PWD/../app
 
 
-DEFINES += SIMPLERENDER
+# DEFINES += SIMPLERENDER
 
 
 # Default rules for deployment.

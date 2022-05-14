@@ -47,7 +47,7 @@ public:
     void disImgSize(int &xs, int &ys);
     void textSize(QPainter &dc, int &sx, int &sy, bool tiny, int &leftoffset, int maxcolwidth);
     int render(Document *doc, int bx, int by, int depth, QPainter &dc, int &leftoffset, int maxcolwidth);
-
+    void findCursor(Document *doc, int bx, int by, QPainter &dc, Selection &s, int maxcolwidth);
     inline int minRelsize(int rs) const { return qMin(relsize, rs); }
     //! 更新修改时间为当前
     inline void wasEdited() { lastedit = QDateTime::currentDateTime(); }

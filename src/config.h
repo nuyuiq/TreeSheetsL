@@ -224,6 +224,7 @@ struct CfgCache {
     uint pen_tinytext;
     uint pen_tinygridlines;
     uint pen_gridlines;
+    uint pen_thinselect;
     bool singletray;
     bool minclose;
     bool totray;
