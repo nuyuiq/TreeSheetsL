@@ -39,6 +39,7 @@ public:
             bool general = true,
             int status=-1,
             QActionGroup *group=nullptr);
+
     //! 更新选中状态在状态栏
     void updateStatus(const Selection &s);
 
@@ -74,7 +75,7 @@ private:
     int savechecker;
 
 
-    QStringList *_tmp_shortcut;
+    QStringList shortcut_bak;
 
 };
 #endif // MAINWINDOW_H

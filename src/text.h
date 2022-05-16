@@ -48,6 +48,12 @@ public:
     void textSize(QPainter &dc, int &sx, int &sy, bool tiny, int &leftoffset, int maxcolwidth);
     int render(Document *doc, int bx, int by, int depth, QPainter &dc, int &leftoffset, int maxcolwidth);
     void findCursor(Document *doc, int bx, int by, QPainter &dc, Selection &s, int maxcolwidth);
+    void insert(Document *doc, const QString &ins, Selection &s);
+    void clear(Document *doc, Selection &s);
+    bool rangeSelRemove(Selection &s);
+    void setRelSize(Selection &s);
+    void drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, bool cursoronly, int maxcolwidth);
+
     inline int minRelsize(int rs) const { return qMin(relsize, rs); }
     //! 更新修改时间为当前
     inline void wasEdited() { lastedit = QDateTime::currentDateTime(); }

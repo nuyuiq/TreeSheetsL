@@ -5,6 +5,8 @@
 #include <QtEndian>
 #include <cmath>
 #include <QPainter>
+#include <QDebug>
+#include <QWidget>
 
 QString Tools::resolvePath(const QString &path, bool exist)
 {
@@ -115,7 +117,12 @@ double Tools::DataIO::readDouble()
 }
 
 void Tools::drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline)
-{
+{    
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(QRect(x, y, xs, ys));
+        return;
+    }
     const Color qcolor(color);
     if (outline) dc.setBrush(QBrush(Qt::transparent));
     else dc.setBrush(QBrush(qcolor));
@@ -123,12 +130,120 @@ void Tools::drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, boo
     dc.drawRect(x, y, xs - 1, ys - 1);
 }
 
-
 void Tools::drawRoundedRect(QPainter &dc, uint color, int roundness, int x, int y, int xs, int ys)
 {
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(QRect(x, y, xs, ys));
+        return;
+    }
     const Color qcolor(color);
     dc.setBrush(QBrush(qcolor));
     dc.setPen(QPen(qcolor));
     const QRect rect(x, y, xs - 1, ys - 1);
     dc.drawRoundedRect(rect, roundness, roundness, Qt::AbsoluteSize);
+}
+
+void Tools::drawRect(QPainter &dc, int x, int y, int xs, int ys)
+{
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(QRect(x, y, xs, ys));
+    }
+    else
+    {
+        dc.drawRect(x, y, xs, ys);
+    }
+}
+
+Tools::Painter::Painter(const QWidget *widget)
+{
+    Q_ASSERT(widget);
+    this->widget = const_cast<QWidget*>(widget);
+    needUpdate = 0;
+    dp = new QPixmap(widget->size());
+    begin(dp);
+#ifdef QT_DEBUG
+    _this = this;
+#endif
+}
+
+Tools::Painter::~Painter()
+{
+    end();
+    delete dp;
+    if (needUpdate == 1)
+    {
+        widget->update(rect);
+    }
+    else if (needUpdate == 2)
+    {
+        widget->update();
+    }
+}
+
+void Tools::Painter::update(const QRect &rect)
+{
+#ifdef QT_DEBUG
+    Q_ASSERT(_this == this);
+#endif
+    if (needUpdate == 2) return;
+    if (rect.isNull())
+    {
+        needUpdate = 2;
+        return;
+    }
+    needUpdate = 1;
+    this->rect |= transform().mapRect(rect);
+}
+
+void Tools::drawLine(QPainter &dc, int x0, int y0, int x1, int y1)
+{
+    if (!dc.hasClipping())
+    {
+        const QPoint tl(qMin(x0, x1) - 1, qMin(y0, y1) - 1);
+        const QPoint br(qMax(x0, x1) + 1, qMax(y0, y1) + 1);
+        Painter::p(dc)->update(QRect(tl, br));
+    }
+    else
+    {
+        dc.drawLine(x0, y0, x1, y1);
+    }
+}
+
+void Tools::drawRoundedRect(QPainter &dc, int roundness, const QRect &rect)
+{
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(rect);
+    }
+    else
+    {
+    dc.drawRoundedRect(rect, roundness, roundness, Qt::AbsoluteSize);
+    }
+}
+
+void Tools::drawImage(QPainter &dc, int x, int y, const QImage &img)
+{
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(QRect(QPoint(x, y), img.size()));
+    }
+    else
+    {
+        dc.drawImage(x, y, img);
+    }
+}
+
+void Tools::drawText(QPainter &dc, const QString &s, int x, int y, int w, int h)
+{
+    QRect rect = dc.boundingRect(x, y, w, h, Qt::AlignLeft | Qt::AlignVCenter, s);
+    if (!dc.hasClipping())
+    {
+        Painter::p(dc)->update(rect);
+    }
+    else
+    {
+        dc.drawText(rect, s);
+    }
 }

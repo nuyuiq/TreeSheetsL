@@ -5,6 +5,7 @@
 
 #include <QVariantMap>
 
+
 struct Document;
 struct Grid;
 namespace Tools { class DataIO; }
@@ -80,6 +81,11 @@ struct Cell
     void lazyLayout(Document *doc, QPainter &dc, int depth, int maxcolwidth, bool forcetiny);
     void layout(Document *doc, QPainter &dc, int depth, int maxcolwidth, bool forcetiny);
     void render(Document *doc, int bx, int by, QPainter &dc, int depth, int ml, int mr, int mt, int mb, int maxcolwidth, int cell_margin);
+    void relSize(int dir, int zoomdepth);
+    bool isParentOf(const Cell *c) const;
+    void clear();
+    void paste(Document *doc, const Cell *c, Selection &s);
+    Cell* clone(Cell *_parent) const;
 
     inline bool hasText() const { return !text.t.isEmpty(); }
     inline bool hasTextSize() const { return hasText() || text.relsize; }

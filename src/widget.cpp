@@ -5,15 +5,16 @@
 #include "myapp.h"
 #include "mainwindow.h"
 #include "symdef.h"
+#include "cell.h"
 
 #include <QScrollArea>
 #include <QLabel>
 #include <QVariant>
-#include <QPainter>
 #include <QDebug>
 #include <QWheelEvent>
 #include <QScrollBar>
 #include <QLineEdit>
+#include <QMenu>
 
 Widget::Widget(QScrollArea *scroll) : scrollwin(scroll)
 {
@@ -44,8 +45,6 @@ void Widget::status(const QString &msg)
 void Widget::updateHover(int mx, int my, QPainter &dc)
 {
     doc->Hover(mx / doc->currentviewscale, my / doc->currentviewscale, dc);
-    // TODO
-    // update();
 }
 
 void Widget::cursorScroll(int dx, int dy)
@@ -69,16 +68,23 @@ void Widget::selectClick(int mx, int my, bool right, int isctrlshift)
         // for some reason, using just the "menu" key sends a right-click at (-1, -1)
         return;
     }
-    QPixmap dp(size());
-    QPainter dc(&dp);
-    dc.setClipRect(0, 0, width(), height());
+    Tools::Painter dc(this);
     updateHover(mx, my, dc);
     doc->select(dc, right, isctrlshift);
 }
 
 QVariant Widget::inputMethodQuery(Qt::InputMethodQuery imq) const
 {
-    //TODO
+    if (imq == Qt::ImCursorRectangle)
+    {
+        Cell* c = doc->selected.getCell();
+        if (c && !c->tiny && (c->hasText() || !c->grid) && doc->selected.textEdit())
+        {
+            Tools::Painter dc(this);
+            doc->shiftToCenter(dc);
+            return dc.transform().mapRect(doc->cursorlastinfo);
+        }
+    }
     return QWidget::inputMethodQuery(imq);
 }
 
@@ -107,17 +113,13 @@ void Widget::wheelEvent(QWheelEvent *e)
     {
         int steps = e->delta() / WHEELDELTA;
         if (!steps) return;
-        QPixmap pd(size());
-        QPainter dc(&pd);
-        dc.setClipRect(0, 0, pd.width(), pd.height());
+        Tools::Painter dc(this);
         updateHover(e->x(), e->y(), dc);
         status(doc->wheel(dc, steps, alt, ctrl, shift));
     }
     else
     {
-        QPixmap pd(size());
-        QPainter dc(&pd);
-        dc.setClipRect(0, 0, pd.width(), pd.height());
+        Tools::Painter dc(this);
         if (e->orientation() == Qt::Horizontal)
         {
             cursorScroll(e->delta() * _g::scrollratewheel, 0);
@@ -133,10 +135,8 @@ void Widget::wheelEvent(QWheelEvent *e)
 
 void Widget::mousePressEvent(QMouseEvent *e)
 {
-    if (e->button() & Qt::LeftButton)
+    if (e->buttons() & Qt::LeftButton)
     {
-        // TODO
-        if (myApp.frame->filter) myApp.frame->filter->setFocus();
         setFocus();
         if (e->modifiers() & Qt::ShiftModifier) mouseMoveEvent(e);
         else
@@ -147,64 +147,67 @@ void Widget::mousePressEvent(QMouseEvent *e)
             selectClick(e->x(), e->y(), false, mk);
         }
     }
-    else
+    else if (e->buttons() & Qt::RightButton)
     {
         setFocus();
         selectClick(e->x(), e->y(), true, 0);
         lastrmbwaswithctrl = e->modifiers() & Qt::ControlModifier;
-        e->ignore();
     }
-    update();
 }
 
 void Widget::mouseReleaseEvent(QMouseEvent *e)
 {
-    if (e->button() & Qt::LeftButton)
+    if (e->buttons() & Qt::LeftButton)
     {
-
         if (e->modifiers() & (Qt::ControlModifier|Qt::AltModifier))
         {
             doc->selectUp();
         }
     }
-    else
-    {
-        // TODO
-    }
-    update();
 }
 
 void Widget::mouseMoveEvent(QMouseEvent *e)
 {
-    QPixmap dp(size());
-    QPainter dc(&dp);
-    //dc.setClipRect(0, 0, width(), height());
+    Tools::Painter dc(this);
     updateHover(e->x(), e->y(), dc);
-    if (e->button() & (Qt::LeftButton | Qt::RightButton))
+    if (e->buttons() & (Qt::LeftButton | Qt::RightButton))
     {
         // TODO
         // doc->Drag(dc);
     }
-    else if (e->button() & Qt::MidButton)
+    else if (e->buttons() & Qt::MiddleButton)
     {
-        const QPoint p = e->pos() - lastmousepos;
+        const QPoint &p = e->pos() - lastmousepos;
         cursorScroll(-p.x(), -p.y());
     }
     lastmousepos = e->pos();
 }
 
-
 void Widget::mouseDoubleClickEvent(QMouseEvent *e)
 {
-    QPixmap dp(size());
-    QPainter dc(&dp);
-    dc.setClipRect(0, 0, width(), height());
+    Tools::Painter dc(this);
     updateHover(e->x(), e->y(), dc);
-    status(doc->doubleClick(dc));
+    doc->doubleClick(dc);
+    setFocus();
+    status(QString());
 }
-
 
 void Widget::contextMenuEvent(QContextMenuEvent *e)
 {
-    // TODO
+    if (lastrmbwaswithctrl)
+    {
+        if (doc->tags.isEmpty()) return;
+        QMenu tagmenu;
+        const auto begin = doc->tags.constBegin();
+        const auto end = doc->tags.constEnd();
+        for (auto itr = begin; itr != end; itr++)
+        {
+            myApp.frame->appendSubMenu(&tagmenu, A_TAGSET + (itr - begin), *itr, QString(), false);
+        }
+        tagmenu.exec(e->globalPos());
+    }
+    else
+    {
+        myApp.frame->editmenupopup->exec(e->globalPos());
+    }
 }

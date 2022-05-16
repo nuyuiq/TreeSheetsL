@@ -209,7 +209,7 @@ enum {
     A_FILEHIS0 = 500,
     //...
 
-//    A_TAGSET = 1000,  // and all values from here on
+    A_TAGSET = 1000,  // and all values from here on
     A_SCRIPT = 2000,  // and all values from here on
 //    A_MAXACTION = 3000
 };

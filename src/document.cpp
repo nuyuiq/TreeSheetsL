@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QPainter>
 #include <QDebug>
+#include <QScrollBar>
 #include <QScrollArea>
 
 Document::Document(Widget *sw)
@@ -25,6 +26,8 @@ Document::Document(Widget *sw)
     while_printing = false;
     scaledviewingmode = false;
     fgutter = 6;
+    isctrlshiftdrag = 0;
+    blink = true;
 }
 
 Document::~Document()
@@ -43,45 +46,63 @@ void Document::initWith(Cell *r, const QString &filename)
 
 void Document::clearSelectionRefresh()
 {
-    // TODO
+    selected.g = nullptr;
+    refresh();
 }
 
 bool Document::scrollIfSelectionOutOfView(QPainter &dc, Selection &s, bool refreshalways)
 {
-    // TODO
-    return true;
-//    if (!scaledviewingmode) {
-//        // required, since sizes of things may have been reset by the last editing operation
-//        Layout(dc);
-//        int canvasw, canvash;
-//        sw->GetClientSize(&canvasw, &canvash);
-//        if ((layoutys > canvash || layoutxs > canvasw) && s.g) {
-//            wxRect r = s.g->GetRect(this, s, true);
-//            if (r.y < originy || r.y + r.height > maxy || r.x < originx ||
-//                    r.x + r.width > maxx) {
-//                int curx, cury;
-//                sw->GetViewStart(&curx, &cury);
-//                sw->SetScrollbars(1, 1, layoutxs, layoutys,
-//                                  r.width > canvasw || r.x < originx
-//                                  ? r.x
-//                                  : r.x + r.width > maxx ? r.x + r.width - canvasw : curx,
-//                                  r.height > canvash || r.y < originy
-//                                  ? r.y
-//                                  : r.y + r.height > maxy ? r.y + r.height - canvash : cury,
+    if (!scaledviewingmode)
+    {
+        // required, since sizes of things may have been reset by the last editing operation
+        layout(dc);
+        const auto &ps = sw->scrollwin->viewport()->size();
+        int canvasw = ps.width(), canvash = ps.height();
+        if ((layoutys > canvash || layoutxs > canvasw) && s.g)
+        {
+            QRect r = s.g->getRect(this, s, true);
+            if (r.y() < originy || r.y() + r.height() > maxy || r.x() < originx ||
+                    r.x() + r.width() > maxx)
+            {
+                const auto &pp = sw->pos();
+                int curx = -pp.x(), cury = -pp.y();
+                // TODO
+                sw->resize(layoutxs, layoutys);
+                auto dx = r.width() > canvasw || r.x() < originx?
+                            r.x():
+                            r.x() + r.width() > maxx ?
+                                r.x() + r.width() - canvasw:
+                                curx;
+                auto dy = r.height() > canvash || r.y() < originy?
+                            r.y():
+                            r.y() + r.height() > maxy?
+                                r.y() + r.height() - canvash:
+                                cury;
+                auto bar = sw->scrollwin->verticalScrollBar();
+                bar->setValue(dy);
+                bar = sw->scrollwin->horizontalScrollBar();
+                bar->setValue(dx);
+//                sw->SetScrollbars(1, 1,
+//                                  layoutxs, layoutys,
+//                                  r.width() > canvasw || r.x() < originx
+//                                  ? r.x(): r.x() + r.width() > maxx ? r.x() + r.width() - canvasw : curx,
+//                                  r.height() > canvash || r.y() < originy
+//                                  ? r.y(): r.y() + r.height() > maxy ? r.y() + r.height() - canvash : cury,
 //                                  true);
-//                RefreshReset();
-//                return true;
-//            }
-//        }
-//    }
-//    if (refreshalways) Refresh();
-//    return refreshalways;
+                refreshReset();
+                return true;
+            }
+        }
+    }
+    if (refreshalways) refresh();
+    return refreshalways;
 }
 
 void Document::drawSelect(QPainter &dc, Selection &s, bool refreshinstead, bool cursoronly)
 {
 #ifdef SIMPLERENDER
-    if (refreshinstead) {
+    if (refreshinstead)
+    {
         refresh();
         return;
     }
@@ -131,8 +152,10 @@ void Document::draw(QPainter &dc)
         int dry = qMax(layoutys, maxy);
         sw->resize(drx, dry);
         const auto &p = sw->pos();
-        const auto &cur = QRect(-p.x(), -p.y(), maxx, maxy);
-        cur.getCoords(&originx, &originy, &maxx, &maxy);
+        originx = -p.x();
+        originy = -p.y();
+        maxx += originx;
+        maxy += originy;
     }
 
     centerx = myApp.cfg->centered && !originx && maxx > layoutxs
@@ -142,13 +165,20 @@ void Document::draw(QPainter &dc)
                   ? (maxy - layoutys) / 2 * currentviewscale
                   : 0;
 
-    // TODO
-    auto roi = dc.clipBoundingRect().toRect() & QRect(originx, originy, maxx, maxy);
+    // 校准绘制区
+    auto roi = dc.clipBoundingRect().toRect();
     if (roi.width() == 0 || roi.height() == 0) return;
-    roi.getCoords(&originx, &originy, &maxx, &maxy);
+    else {
+        const auto &o = QRect(originx, originy, maxx - originx, maxy - originy);
+        const auto &tf = QTransform()  // TODO 顺序
+                .scale(1/currentviewscale, 1/currentviewscale)
+                .translate(-centerx, -centery)
+                ;
+        const auto &n = o & tf.mapRect(roi);
+        n.getCoords(&originx, &originy, &maxx, &maxy);
+    }
 
     shiftToCenter(dc);
-
 
     render(dc);
     drawSelect(dc, selected);
@@ -179,6 +209,8 @@ void Document::layout(QPainter &dc)
 
 void Document::shiftToCenter(QPainter &dc)
 {
+    // 已经进行过变换了
+    if (dc.transform().map(QPoint(1, 1)) != QPoint(1, 1)) return;
     const auto &ps = dc.viewport().topLeft();
     dc.translate(ps.x() > 0? -ps.x(): centerx, ps.y() > 0? ps.y(): centery);
     dc.scale(currentviewscale, currentviewscale);
@@ -192,11 +224,13 @@ void Document::render(QPainter &dc)
     pen.setColor(Qt::lightGray);
     dc.setPen(pen);
     int i = 0;
+    const int cHeight = dc.fontMetrics().height();
+    const int cAscent = dc.fontMetrics().ascent();
     for (Cell *p = curdrawroot->p; p; p = p->p)
     {
         if (p->text.t.length())
         {
-            int off = hierarchysize - dc.fontMetrics().height() * ++i;
+            int off = hierarchysize - cHeight * ++i;
             QString s = p->text.t;
             if (s.length() > myApp.cfg->defaultmaxcolwidth)
             {
@@ -204,7 +238,7 @@ void Document::render(QPainter &dc)
                 // worst that can happen on a thin window is that its rendering gets cut off
                 s = s.left(myApp.cfg->defaultmaxcolwidth) + QStringLiteral("...");
             }
-            dc.drawText(off, off, s);
+            dc.drawText(off, off + cAscent, s);
         }
     }
     pen.setColor(Qt::black);
@@ -335,39 +369,42 @@ bool Document::fontIsMini(int textsize) const
 
 const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool shift, bool hierarchical)
 {
-//    if (!dir) return QString();
-//    shiftToCenter(dc);
-//    if (alt)
-//    {
-//        if (!selected.g) return NoSel();
-//        if (selected.xs > 0) {
-//            // FIXME: should do undo, but this is a lot of undos that need to coalesced, same
-//            // for relsize
-//            selected.g->ResizeColWidths(dir, selected, hierarchical);
-//            selected.g->cell->ResetLayout();
-//            selected.g->cell->ResetChildren();
-//            sys->UpdateStatus(selected);
-//            Refresh();
-//            return dir > 0 ? _(L"Column width increased.") : _(L"Column width decreased.");
-//        }
-//        return L"nothing to resize";
-//    } else if (shift) {
-//        if (!selected.g) return NoSel();
-//        selected.g->cell->AddUndo(this);
-//        selected.g->ResetChildren();
-//        selected.g->RelSize(-dir, selected, pathscalebias);
-//        sys->UpdateStatus(selected);
-//        Refresh();
-//        return dir > 0 ? _(L"Text size increased.") : _(L"Text size decreased.");
-//    } else if (ctrl) {
-//        int steps = abs(dir);
-//        dir = sign(dir);
-//        loop(i, steps) Zoom(dir, dc);
-//        return dir > 0 ? _(L"Zoomed in.") : _(L"Zoomed out.");
-//    } else {
-//        ASSERT(0);
-//        return nullptr;
-//    }
+    if (!dir) return QString();
+    shiftToCenter(dc);
+    if (alt)
+    {
+        if (!selected.g) return noSel();
+        if (selected.xs > 0)
+        {
+            // FIXME: should do undo, but this is a lot of undos that need to coalesced, same
+            // for relsize
+            selected.g->resizeColWidths(dir, selected, hierarchical);
+            selected.g->cell->resetLayout();
+            selected.g->cell->resetChildren();
+            myApp.frame->updateStatus(selected);
+            refresh();
+            return dir > 0 ? tr("Column width increased.") : tr("Column width decreased.");
+        }
+        return tr("nothing to resize");
+    }
+    else if (shift)
+    {
+        if (!selected.g) return noSel();
+        selected.g->cell->addUndo(this);
+        selected.g->resetChildren();
+        selected.g->relSize(-dir, selected, pathscalebias);
+        myApp.frame->updateStatus(selected);
+        refresh();
+        return dir > 0 ? tr("Text size increased.") : tr("Text size decreased.");
+    }
+    else if (ctrl)
+    {
+        int steps = qAbs(dir);
+        dir = dir > 0? 1: -1; // TODO
+        for (int i = 0; i < steps; i++) zoom(dir, dc);
+        return dir > 0 ? tr("Zoomed in.") : tr("Zoomed out.");
+    }
+    Q_ASSERT(false);
     return QString();
 }
 
@@ -391,44 +428,49 @@ void Document::Hover(int x, int y, QPainter &dc)
 
 void Document::select(QPainter &dc, bool right, int isctrlshift)
 {
-//    begindrag = Selection();
-//    if (right && hover.IsInside(selected)) return;
-//    ShiftToCenter(dc);
-//    DrawSelect(dc, selected);
-//    if (selected.GetCell() == hover.GetCell() && hover.GetCell()) hover.EnterEditOnly(this);
-//    selected = hover;
-//    begindrag = hover;
-//    isctrlshiftdrag = isctrlshift;
-//    DrawSelectMove(dc, selected);
-//    ResetCursor();
-//    return;
+    begindrag = Selection();
+    if (right && hover.isInside(selected)) return;
+    shiftToCenter(dc);
+    drawSelect(dc, selected);
+    if (selected.getCell() == hover.getCell() && hover.getCell())
+    {
+        hover.enterEditOnly(this);
+    }
+    selected = hover;
+    begindrag = hover;
+    isctrlshiftdrag = isctrlshift;
+    drawSelectMove(dc, selected);
+    resetCursor();
+    return;
 }
 
 void Document::selectUp()
 {
-//    if (!isctrlshiftdrag || isctrlshiftdrag == 3 || begindrag.EqLoc(selected)) return;
-//    Cell *c = selected.GetCell();
-//    if (!c) return;
-//    Cell *tc = begindrag.ThinExpand(this);
-//    selected = begindrag;
-//    if (tc) {
-//        auto is_parent = tc->IsParentOf(c);
-//        auto tc_parent = tc->parent;  // tc may be deleted.
-//        tc->Paste(this, c, begindrag);
-//        // If is_parent, c has been deleted already.
-//        if (isctrlshiftdrag == 1 && !is_parent) {
-//            c->parent->AddUndo(this);
-//            Selection cs = c->parent->grid->FindCell(c);
-//            c->parent->grid->MultiCellDeleteSub(this, cs);
-//        }
-//        hover = selected = tc_parent ? tc_parent->grid->FindCell(tc) : Selection();
-//    }
-//    refresh();
+    if (!isctrlshiftdrag || isctrlshiftdrag == 3 || begindrag.eqLoc(selected)) return;
+    Cell *c = selected.getCell();
+    if (!c) return;
+    Cell *tc = begindrag.thinExpand(this);
+    selected = begindrag;
+    if (tc)
+    {
+        auto is_parent = tc->isParentOf(c);
+        auto tc_parent = tc->p;  // tc may be deleted.
+        tc->paste(this, c, begindrag);
+        // If is_parent, c has been deleted already.
+        if (isctrlshiftdrag == 1 && !is_parent)
+        {
+            c->p->addUndo(this);
+            Selection cs = c->p->grid->findCell(c);
+            c->p->grid->multiCellDeleteSub(this, cs);
+        }
+        hover = selected = tc_parent ? tc_parent->grid->findCell(tc) : Selection();
+    }
+    refresh();
 }
 
-const QString Document::doubleClick(QPainter &dc)
+void Document::doubleClick(QPainter &dc)
 {
-    if (!selected.g) return QString();
+    if (!selected.g) return;
     shiftToCenter(dc);
     Cell *c = selected.getCell();
     if (selected.thin())
@@ -449,13 +491,65 @@ const QString Document::doubleClick(QPainter &dc)
         }
         drawSelect(dc, selected, true);
     }
-    return QString();
 }
 
 void Document::refreshHover()
 {
     redrawpending = true;
-    // if (sw) sw->update();
     myApp.frame->updateStatus(selected);
     myApp.frame->nb->update();
+}
+
+void Document::zoom(int dir, QPainter &dc, bool fromroot, bool selectionmaybedrawroot)
+{
+    int len = qMax(0, (fromroot ? 0 : drawpath.size()) + dir);
+    if (!len && !drawpath.size()) return;
+    if (dir > 0)
+    {
+        if (!selected.g) return;
+        Cell *c = selected.getCell();
+        createPath(c && c->grid ? c : selected.g->cell, drawpath);
+    }
+    else if (dir < 0)
+    {
+        Cell *drawroot = walkPath(drawpath);
+        if (drawroot->grid && drawroot->grid->folded && selectionmaybedrawroot)
+        {
+            selected = drawroot->p->grid->findCell(drawroot);
+        }
+    }
+    while (len < drawpath.size()) drawpath.remove(0);
+    Cell *drawroot = walkPath(drawpath);
+    if (selected.getCell() == drawroot && drawroot->grid)
+    {
+        selected = Selection(drawroot->grid, 0, 0, drawroot->grid->xs, drawroot->grid->ys);
+    }
+    drawroot->resetLayout();
+    drawroot->resetChildren();
+    layout(dc);
+    drawSelectMove(dc, selected, true, false);
+}
+
+void Document::createPath(Cell *c, QVector<Selection> &path)
+{
+    path.clear();
+    while (c->p)
+    {
+        const Selection &s = c->p->grid->findCell(c);
+        Q_ASSERT(s.g);
+        path.push_back(s);
+        c = c->p;
+    }
+}
+
+void Document::Blink()
+{
+    if (redrawpending) return;
+#ifndef SIMPLERENDER
+    Tools::Painter dc(sw);
+    shiftToCenter(dc);
+    drawSelect(dc, selected, false, true);
+    blink = !blink;
+    drawSelect(dc, selected, true, true);
+#endif
 }

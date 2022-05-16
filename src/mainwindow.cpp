@@ -28,9 +28,7 @@
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     myApp.frame = this;
-    _tmp_shortcut = new QStringList;
     initUI();
-    DELPTR(_tmp_shortcut);
     watcher = new QFileSystemWatcher(this);
     connect(watcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::fileChanged);
 
@@ -176,12 +174,9 @@ void MainWindow::createShortcut(const QVariant &key, int kid)
     const QKeySequence &ks = key.type() != QVariant::String?
                 QKeySequence(key.toInt()):
                 QKeySequence(key.toString());
-    if (Q_LIKELY(_tmp_shortcut))
-    {
-        auto k = ks.toString();
-        if (k.isEmpty() || _tmp_shortcut->contains(k)) return;
-        _tmp_shortcut->append(k);
-    }
+    auto k = ks.toString();
+    if (k.isEmpty() || shortcut_bak.contains(k)) return;
+    shortcut_bak.append(k);
     auto* shortcut = new QShortcut(ks, this, SLOT(actionActivated()));
     shortcut->setProperty("kid", kid);
 }
@@ -203,11 +198,11 @@ void MainWindow::initUI()
 
     {
         QString p = Tools::resolvePath(QStringLiteral("images/nuvola/fold.png"), true);
-        if (!p.isEmpty()) foldicon = ImagePtr(new Image(QImage(p), 1 / 3));
+        if (!p.isEmpty()) foldicon = ImagePtr(new Image(QImage(p), 3));
         p =  Tools::resolvePath(QStringLiteral("images/render/line_nw.png"), true);
-        if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1 / 3));
+        if (!p.isEmpty()) line_nw = ImagePtr(new Image(QImage(p), 1));
         p =  Tools::resolvePath(QStringLiteral("images/render/line_sw.png"), true);
-        if (!p.isEmpty()) line_sw = ImagePtr(new Image(QImage(p), 1 / 3));
+        if (!p.isEmpty()) line_sw = ImagePtr(new Image(QImage(p), 1));
     }
 
     bool mergetbar = myApp.cfg->read(QStringLiteral("mergetbar"), true).toBool();
@@ -843,7 +838,11 @@ void MainWindow::timerEvent(QTimerEvent *event)
     int tid = event->timerId();
     if (tid == blinkTimer)
     {
-        // TODO
+        int idx = nb->currentIndex();
+        if (idx == -1) return;
+        Widget*widget = getTabByIndex(idx);
+        Q_ASSERT(widget);
+        widget->doc->Blink();
     }
     else if (savechecker)
     {

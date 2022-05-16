@@ -142,43 +142,71 @@ void Grid::move(int dx, int dy, Selection &s)
 
 void Grid::drawSelect(Document *doc, QPainter &dc, Selection &s, bool cursoronly)
 {
-//#ifndef SIMPLERENDER
-//    dc.SetLogicalFunction(wxINVERT);
-//#endif
-//    if (s.Thin()) {
-//        if (!cursoronly) DrawInsert(doc, dc, s, 0);
-//    } else {
-//        if (!cursoronly) {
-//            dc.SetBrush(*wxBLACK_BRUSH);
-//            dc.SetPen(*wxBLACK_PEN);
-//            wxRect g = GetRect(doc, s);
-//            int lw = g_line_width;
-//            int te = s.TextEdit();
-//            dc.DrawRectangle(g.x - 1 - lw, g.y - 1 - lw, g.width + 2 + 2 * lw, 2 + lw - te);
-//            dc.DrawRectangle(g.x - 1 - lw, g.y - 1 + g.height + te, g.width + 2 + 2 * lw - 5,
-//                             2 + lw - te);
+#ifndef SIMPLERENDER
+    auto old = dc.compositionMode();
+    dc.setCompositionMode(QPainter::RasterOp_NotDestination);
+#endif
+    if (s.thin())
+    {
+        if (!cursoronly) drawInsert(doc, dc, s, 0);
+    }
+    else
+    {
+        if (!cursoronly)
+        {
+            dc.setBrush(QBrush(Qt::black));
+            dc.setPen(QColor(Qt::black));
+            const QRect &g = getRect(doc, s);
+            const int lw = _g::line_width;
+            const int te = s.textEdit();
+            Tools::drawRect(dc,
+                            g.x() - 1 - lw,
+                            g.y() - 1 - lw,
+                            g.width() + 2 + 2 * lw,
+                            2 + lw - te);
+            Tools::drawRect(dc,
+                            g.x() - 1 - lw,
+                            g.y() - 1 + g.height() + te,
+                            g.width() + 2 + 2 * lw - 5,
+                            2 + lw - te);
 
-//            dc.DrawRectangle(g.x - 1 - lw, g.y + 1 - te, 2 + lw - te, g.height - 2 + 2 * te);
-//            dc.DrawRectangle(g.x - 1 + g.width + te, g.y + 1 - te, 2 + lw - te,
-//                             g.height - 2 + 2 * te - 2 - te);
+            Tools::drawRect(dc,
+                            g.x() - 1 - lw,
+                            g.y() + 1 - te,
+                            2 + lw - te,
+                            g.height() - 2 + 2 * te);
+            Tools::drawRect(dc,
+                            g.x() - 1 + g.width() + te,
+                            g.y() + 1 - te,
+                            2 + lw - te,
+                            g.height() - 2 + 2 * te - 2 - te);
 
-//            dc.DrawRectangle(g.x + g.width, g.y + g.height - 2, lw + 2, lw + 4);
-//            dc.DrawRectangle(g.x + g.width - lw - 1, g.y + g.height - 2 + 2 * te, lw + 1,
-//                             lw + 4 - 2 * te);
-//        }
-//#ifndef SIMPLERENDER
-//        dc.SetLogicalFunction(wxXOR);
-//#endif
-//        if (s.TextEdit())
-//#ifdef SIMPLERENDER
-//            DrawCursor(doc, dc, s, true, 0x00FF00, cursoronly);
-//#else
-//            DrawCursor(doc, dc, s, true, 0xFFFF, cursoronly);
-//#endif
-//    }
-//#ifndef SIMPLERENDER
-//    dc.SetLogicalFunction(wxCOPY);
-//#endif
+            Tools::drawRect(dc,
+                            g.x() + g.width(),
+                            g.y() + g.height() - 2,
+                            lw + 2,
+                            lw + 4);
+            Tools::drawRect(dc,
+                            g.x() + g.width() - lw - 1,
+                            g.y() + g.height() - 2 + 2 * te,
+                            lw + 1,
+                            lw + 4 - 2 * te);
+        }
+#ifndef SIMPLERENDER
+        dc.setCompositionMode(QPainter::RasterOp_SourceXorDestination);
+#endif
+        if (s.textEdit())
+        {
+#ifdef SIMPLERENDER
+            drawCursor(doc, dc, s, 0x00FF00, cursoronly);
+#else
+            drawCursor(doc, dc, s, 0xFFFF, cursoronly);
+#endif
+        }
+    }
+#ifndef SIMPLERENDER
+    dc.setCompositionMode(old);
+#endif
 }
 
 void Grid::insertCells(int dx, int dy, int nxs, int nys, Cell *nc) {
@@ -309,7 +337,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
                 {
                     for (int line = 0; line < _g::line_width; line++)
                     {
-                        dc.drawLine(
+                        Tools::drawLine(dc,
                                     xl + line, qMax(doc->originy, by + yoff + view_grid_outer_spacing),
                                     xl + line, qMin(doc->maxy, by + maxy + _g::line_width) + view_margin);
                     }
@@ -322,7 +350,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
                 {
                     for (int line = 0; line < _g::line_width; line++)
                     {
-                        dc.drawLine(qMax(doc->originx,
+                        Tools::drawLine(dc, qMax(doc->originx,
                                         bx + xoff + view_grid_outer_spacing + _g::line_width),
                                     yl + line, qMin(doc->maxx, bx + maxx) + view_margin,
                                     yl + line);
@@ -373,7 +401,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
             {
                 if (destyfirst < 0) destyfirst = desty;
                 destylast = desty;
-                if (visible) dc.drawLine(srcx, desty, destx, desty);
+                if (visible) Tools::drawLine(dc, srcx, desty, destx, desty);
             }
             else
             {
@@ -383,7 +411,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
                     destylast = desty + arcsize;
                     if (visible && !!myApp.frame->line_nw)
                     {
-                        dc.drawImage(srcx, desty, myApp.frame->line_nw->display());
+                        Tools::drawImage(dc, srcx, desty, myApp.frame->line_nw->display());
                     }
                 }
                 else
@@ -391,16 +419,16 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
                     destylast = desty - arcsize;
                     if (visible && !!myApp.frame->line_sw)
                     {
-                        dc.drawImage(srcx, desty - arcsize, myApp.frame->line_sw->display());
+                        Tools::drawImage(dc, srcx, desty - arcsize, myApp.frame->line_sw->display());
                     }
                     desty--;
                 }
-                if (visible) dc.drawLine(srcx + arcsize, desty, destx, desty);
+                if (visible) Tools::drawLine(dc, srcx + arcsize, desty, destx, desty);
             }
         }
         if (cell->verticaltextandgrid)
         {
-            if (destylast > 0) dc.drawLine(srcx, srcy, srcx, destylast);
+            if (destylast > 0) Tools::drawLine(dc, srcx, srcy, srcx, destylast);
         }
         else
         {
@@ -408,7 +436,7 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
             {
                 destyfirst = qMin(destyfirst, srcy);
                 destylast = qMax(destylast, srcy);
-                dc.drawLine(srcx, destyfirst, srcx, destylast);
+                Tools::drawLine(dc, srcx, destyfirst, srcx, destylast);
             }
         }
     }
@@ -418,11 +446,11 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
         dc.setPen(Color(bordercolor));
         for (int i = 0; i < view_grid_outer_spacing - 1; i++)
         {
-            QRectF rect(bx + xoff + view_grid_outer_spacing - i,
+            QRect rect(bx + xoff + view_grid_outer_spacing - i,
                         by + yoff + view_grid_outer_spacing - i,
                         maxx - xoff - view_grid_outer_spacing + 1 + i * 2 + view_margin,
                         maxy - yoff - view_grid_outer_spacing + 1 + i * 2 + view_margin);
-            dc.drawRoundedRect(rect, myApp.cfg->roundness, myApp.cfg->roundness, Qt::AbsoluteSize);
+            Tools::drawRoundedRect(dc, myApp.cfg->roundness, rect);
         }
     }
 }
@@ -430,22 +458,6 @@ void Grid::render(Document *doc, int bx, int by, QPainter &dc, int depth)
 void Grid::drawHover(Document *doc, QPainter &dc, Selection &s)
 {
 #ifndef SIMPLERENDER
-    QRect rect;
-    const bool thin = s.thin();
-    if (!thin)
-    {
-        const Cell *c = C(s.x, s.y);
-        rect = QRect(c->getX(doc) - cell_margin,
-                                c->getY(doc) - cell_margin,
-                                c->sx + cell_margin * 2,
-                                c->sy + cell_margin * 2);
-        if (!dc.hasClipping())
-        {
-            doc->sw->update(dc.transform().mapRect(rect));
-            return;
-        }
-    }
-
 #ifdef Q_OS_MAC
     const uint thincol = 0xFFFFFF;
     const uint bgcol = 0xFFFFFF;
@@ -455,12 +467,17 @@ void Grid::drawHover(Document *doc, QPainter &dc, Selection &s)
 #endif
     auto old = dc.compositionMode();
     dc.setCompositionMode(QPainter::RasterOp_SourceXorDestination);
-    if (thin)
+    if (s.thin())
     {
         drawInsert(doc, dc, s, thincol);
     }
     else
     {
+        const Cell *c = C(s.x, s.y);
+        QRect rect = QRect(c->getX(doc) - cell_margin,
+                                c->getY(doc) - cell_margin,
+                                c->sx + cell_margin * 2,
+                                c->sy + cell_margin * 2);
         Tools::drawRect(dc, bgcol, rect.x(), rect.y(), rect.width(), rect.height());
     }
     dc.setCompositionMode(old);
@@ -498,28 +515,17 @@ void Grid::drawInsert(Document *doc, QPainter &dc, Selection &s, uint colour)
         }
         bline.setRect(c->getX(doc), y - 1, c->sx, _g::line_width + 2);
     }
-    if (dc.hasClipping())
+
+    QPen pen(dc.pen());
+    pen.setColor(Color(myApp.cfg->pen_thinselect));
+    pen.setStyle(Qt::CustomDashLine);
+    pen.setDashPattern(QVector<qreal>() << 2 << 4);
+    dc.setPen(pen);
+    for (auto itr = lines.constBegin(); itr != lines.constEnd(); itr++)
     {
-        QPen pen(dc.pen());
-        pen.setColor(Color(myApp.cfg->pen_thinselect));
-        pen.setStyle(Qt::CustomDashLine);
-        pen.setDashPattern(QVector<qreal>() << 2 << 4);
-        dc.setPen(pen);
-        foreach (const QRect &line, qAsConst(lines))
-        {
-            dc.drawLine(line.left(), line.top(), line.right(), line.bottom());
-        }
-        Tools::drawRect(dc, colour, bline.x(), bline.y(), bline.width(), bline.height());
+        Tools::drawLine(dc, itr->left(), itr->top(), itr->right(), itr->bottom());
     }
-    else
-    {
-        foreach (const QRect &line, qAsConst(lines))
-        {
-            bline |= line;
-        }
-        auto rr = dc.transform().mapRect(bline);
-        doc->sw->update(rr);
-    }
+    Tools::drawRect(dc, colour, bline.x(), bline.y(), bline.width(), bline.height());
 }
 
 void Grid::findXY(Document *doc, int px, int py, QPainter &dc)
@@ -561,5 +567,196 @@ void Grid::findXY(Document *doc, int px, int py, QPainter &dc)
             }
             return;
         }
+    }
+}
+
+void Grid::resizeColWidths(int dir, const Selection &s, bool hierarchical)
+{
+    for (int x = s.x; x < s.x + s.xs; x++)
+    {
+        colwidths[x] += dir * 5;
+        if (colwidths[x] < 5) colwidths[x] = 5;
+        for (int y = 0; y < ys; y++)
+        {
+            Cell *c = C(x, y);
+            if (c->grid && hierarchical)
+            {
+                c->grid->resizeColWidths(dir, c->grid->selectAll(), hierarchical);
+            }
+        }
+    }
+}
+
+void Grid::relSize(int dir, int zoomdepth)
+{
+    foreachcell(c) c->relSize(dir, zoomdepth);
+}
+
+void Grid::relSize(int dir, Selection &s, int zoomdepth)
+{
+    foreachcellinsel(c, s) c->relSize(dir, zoomdepth);
+}
+
+void Grid::multiCellDeleteSub(Document *doc, Selection &s)
+{
+    foreachcellinsel(c, s) c->clear();
+    bool delhoriz = true, delvert = true;
+    foreachcell(c)
+    {
+        if (c->hasContent())
+        {
+            if (y >= s.y && y < s.y + s.ys) delhoriz = false;
+            if (x >= s.x && x < s.x + s.xs) delvert = false;
+        }
+    }
+    if (delhoriz && (!delvert || s.xs >= s.ys))
+    {
+        if (s.ys == ys)
+        {
+            delSelf(doc, s);
+        }
+        else
+        {
+            for (int i = 0; i < s.ys; i++) deleteCells(-1, s.y, 0, -1);
+            s.ys = 0;
+            s.xs = 1;
+        }
+    }
+    else if (delvert)
+    {
+        if (s.xs == xs)
+        {
+            delSelf(doc, s);
+        }
+        else
+        {
+            for (int i = 0; i < s.xs; i++) deleteCells(s.x, -1, -1, 0);
+            s.xs = 0;
+            s.ys = 1;
+        }
+    }
+    else
+    {
+        Cell *c = s.getCell();
+        if (c) s.enterEdit(doc);
+    }
+}
+
+void Grid::delSelf(Document *doc, Selection &s)
+{
+    for (auto c = doc->curdrawroot; c; c = c->p)
+        if (c == cell) return;  // FIXME, if drawroot, auto zoom out instead (needs dc)
+    s = cell->p->grid->findCell(cell);
+    Grid *&pthis = cell->grid;
+    DELPTR(pthis);
+}
+
+void Grid::deleteCells(int dx, int dy, int nxs, int nys)
+{
+    Cell **ncells = new Cell *[(xs + nxs) * (ys + nys)];
+    Cell **ncp = ncells;
+    int *ncw = new int[xs + nxs];
+    int *ncwp = ncw;
+    foreachcell(c) if (x == dx || y == dy)
+    {
+        DELPTR(c);
+    }
+    else *ncp++ = c;
+    for (int x = 0; x < xs; x++) if (x != dx) *ncwp++ = colwidths[x];
+    delete[] cells;
+    cells = ncells;
+    delete[] colwidths;
+    colwidths = ncw;
+    xs += nxs;
+    ys += nys;
+    setOrient();
+}
+
+void Grid::clone(Grid *g)
+{
+    g->bordercolor = bordercolor;
+    g->user_grid_outer_spacing = user_grid_outer_spacing;
+    g->folded = folded;
+    foreachcell(c) g->C(x, y) = c->clone(g->cell);
+    for (int x = 0; x < xs; x++) g->colwidths[x] = colwidths[x];
+}
+
+void Grid::mergeWithParent(Grid *p, Selection &s)
+{
+    cell->grid = nullptr;
+    foreachcell(c)
+    {
+        if (x + s.x >= p->xs) p->insertCells(p->xs, -1, 1, 0);
+        if (y + s.y >= p->ys) p->insertCells(-1, p->ys, 0, 1);
+        Cell *pc = p->C(x + s.x, y + s.y);
+        if (pc->hasContent())
+        {
+            if (x) p->insertCells(s.x + x, -1, 1, 0);
+            pc = p->C(x + s.x, y + s.y);
+            if (pc->hasContent()) {
+                if (y) p->insertCells(-1, s.y + y, 0, 1);
+                pc = p->C(x + s.x, y + s.y);
+            }
+        }
+        delete pc;
+        p->C(x + s.x, y + s.y) = c;
+        c->p = p->cell;
+        c = nullptr;
+    }
+    s.g = p;
+    s.xs += xs - 1;
+    s.ys += ys - 1;
+    delete this;
+}
+
+QRect Grid::getRect(Document *doc, Selection &s, bool minimal)
+{
+    if (s.thin())
+    {
+        if (s.xs)
+        {
+            if (s.y < ys)
+            {
+                Cell *tl = C(s.x, s.y);
+                return QRect(tl->getX(doc), tl->getY(doc), tl->sx, 0);
+            }
+            else
+            {
+                Cell *br = C(s.x, ys - 1);
+                return QRect(br->getX(doc), br->getY(doc) + br->sy, br->sx, 0);
+            }
+        }
+        else
+        {
+            if (s.x < xs)
+            {
+                Cell *tl = C(s.x, s.y);
+                return QRect(tl->getX(doc), tl->getY(doc), 0, tl->sy);
+            }
+            else
+            {
+                Cell *br = C(xs - 1, s.y);
+                return QRect(br->getX(doc) + br->sx, br->getY(doc), 0, br->sy);
+            }
+        }
+    }
+    else
+    {
+        Cell *tl = C(s.x, s.y);
+        Cell *br = C(s.x + s.xs - 1, s.y + s.ys - 1);
+        QRect r(tl->getX(doc) - cell_margin, tl->getY(doc) - cell_margin,
+                 br->getX(doc) + br->sx - tl->getX(doc) + cell_margin * 2,
+                 br->getY(doc) + br->sy - tl->getY(doc) + cell_margin * 2);
+        if (minimal && tl == br) r.setWidth(qMax(r.width() - (tl->sx - tl->minx), 0));
+        return r;
+    }
+}
+
+void Grid::drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, bool cursoronly)
+{
+    Cell *c = s.getCell();
+    if (c && !c->tiny && (c->hasText() || !c->grid))
+    {
+        c->text.drawCursor(doc, dc, s, color, cursoronly, colwidths[s.x]);
     }
 }

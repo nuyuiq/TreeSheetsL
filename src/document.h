@@ -4,9 +4,10 @@
 #include "selection.h"
 
 #include <QString>
-#include <QMap>
 #include <QDateTime>
 #include <QVector>
+#include <QCoreApplication>
+#include <QRect>
 
 class Widget;
 struct Cell;
@@ -17,7 +18,7 @@ class Selection;
 struct Document
 {
     QString filename;
-    QMap<QString, bool> tags;
+    QStringList tags;
     QDateTime lastmodificationtime;
     Widget *sw;
     Cell *rootgrid;
@@ -27,6 +28,7 @@ struct Document
     Selection selected;
     Selection begindrag;
     QVector<Selection> drawpath;
+    QRect cursorlastinfo;
 
     double currentviewscale;
     long lastmodsinceautosave;
@@ -46,11 +48,13 @@ struct Document
     int lasttextsize;
     int laststylebits;
     int pathscalebias;
+    int isctrlshiftdrag;
     bool modified;
     //bool tmpsavesuccess;
     bool redrawpending;
     bool while_printing;
     bool scaledviewingmode;
+    bool blink;
 
 
 
@@ -81,10 +85,21 @@ struct Document
     void Hover(int x, int y, QPainter &dc);
     void select(QPainter &dc, bool right, int isctrlshift);
     void selectUp();
-    const QString doubleClick(QPainter &dc);
+    void doubleClick(QPainter &dc);
     void refreshHover();
-    inline void refreshReset() { refresh(); }
+    void zoom(int dir, QPainter &dc, bool fromroot = false, bool selectionmaybedrawroot = true);
+    void createPath(Cell *c, QVector<Selection> &path);
+    void Blink();
 
+    inline void resetCursor() { if (selected.g) selected.setCursorEdit(this, selected.textEdit()); }
+    inline void refreshReset() { refresh(); }
+    // 状态栏提示语
+    inline QString noSel() const { return tr("This operation requires a selection."); }
+    inline QString oneCell() const { return tr("This operation works on a single selected cell only."); }
+    inline QString noThin()  const { return tr("This operation doesn't work on thin selections."); }
+    inline QString noGrid()  const { return tr("This operation requires a cell that contains a grid."); }
+    // 定义 Document 内翻译助手
+    Q_DECLARE_TR_FUNCTIONS(Document)
 };
 
 

@@ -191,22 +191,6 @@ void Text::textSize(QPainter &dc, int &sx, int &sy, bool tiny, int &leftoffset, 
     if (!tiny) sx += 4;
 }
 
-static void myDrawText(QPainter &dc, const QString &s, int x, int y, int w, int h)
-{
-#ifdef __WXMSW__  // this special purpose implementation is because the MSW implementation calls
-    // TextExtent, which costs
-    // 25% of all cpu time
-    dc.CalcBoundingBox(x, y);
-    dc.CalcBoundingBox(x + w, y + h);
-    HDC hdc = (HDC)dc.GetHDC();
-    ::SetTextColor(hdc, dc.GetTextForeground().GetPixel());
-    ::SetBkColor(hdc, dc.GetTextBackground().GetPixel());
-    ::ExtTextOut(hdc, x, y, 0, nullptr, s.c_str(), s.length(), nullptr);
-#else
-    dc.drawText(dc.boundingRect(x, y, w, h, Qt::AlignLeft | Qt::AlignVCenter, s), s);
-#endif
-}
-
 int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &leftoffset, int maxcolwidth)
 {
     int ixs = 0, iys = 0;
@@ -216,7 +200,7 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
     }
     if (ixs && iys)
     {
-        dc.drawImage(bx + 1 + _g::margin_extra, by + (cell->tys - iys) / 2 + _g::margin_extra, displayImage());
+        Tools::drawImage(dc, bx + 1 + _g::margin_extra, by + (cell->tys - iys) / 2 + _g::margin_extra, displayImage());
         ixs += 2;
         iys += 2;
     }
@@ -225,7 +209,6 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
 
     doc->pickFont(dc, depth, relsize, stylebits);
 
-    // TODO
     int h = cell->tiny ? 1 : dc.fontMetrics().height();
     leftoffset = h;
     int i = 0;
@@ -248,7 +231,7 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
         {
             if (myApp.cfg->fastrender)
             {
-                dc.drawLine(bx + ixs, by + lines * h, bx + ixs + curl.length(), by + lines * h);
+                Tools::drawLine(dc, bx + ixs, by + lines * h, bx + ixs + curl.length(), by + lines * h);
             }
             else
             {
@@ -259,7 +242,7 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
                     {
                         if (word)
                         {
-                            dc.drawLine(bx + p - word + ixs, by + lines * h,
+                            Tools::drawLine(dc, bx + p - word + ixs, by + lines * h,
                                               bx + p, by + lines * h);
                         }
                         word = 0;
@@ -272,7 +255,7 @@ int Text::render(Document *doc, int bx, int by, int depth, QPainter &dc, int &le
         {
             int tx = bx + 2 + ixs;
             int ty = by + lines * h;
-            myDrawText(dc, curl, tx + _g::margin_extra, ty + _g::margin_extra, cell->sx, h);
+            Tools::drawText(dc, curl, tx + _g::margin_extra, ty + _g::margin_extra, cell->sx, h);
         }
         lines++;
     }
@@ -310,4 +293,123 @@ void Text::findCursor(Document *doc, int bx, int by, QPainter &dc, Selection &s,
 
     s.cursor = s.cursorend = linestart + ls.length();
     Q_ASSERT(s.cursor >= 0 && s.cursor <= t.length());
+}
+
+void Text::insert(Document *doc, const QString &ins, Selection &s)
+{
+    auto prevl = t.length();
+    if (!s.textEdit()) clear(doc, s);
+    rangeSelRemove(s);
+    if (!prevl) setRelSize(s);
+    t.insert(s.cursor, ins);
+    s.cursor = s.cursorend = s.cursor + ins.length();
+}
+
+void Text::clear(Document *doc, Selection &s)
+{
+    t.clear();
+    s.enterEdit(doc);
+}
+
+bool Text::rangeSelRemove(Selection &s)
+{
+    wasEdited();
+    if (s.cursor != s.cursorend)
+    {
+        t.remove(s.cursor, s.cursorend - s.cursor);
+        s.cursorend = s.cursor;
+        return true;
+    }
+    return false;
+}
+
+void Text::setRelSize(Selection &s)
+{
+    if (t.length() || !cell->p) return;
+    int dd[] = { 0, 1, 1, 0, 0, -1, -1, 0 };
+    for (int i = 0; i < 4; i++)
+    {
+        int x = qMax(0, qMin(s.x + dd[i * 2], s.g->xs - 1));
+        int y = qMax(0, qMin(s.y + dd[i * 2 + 1], s.g->ys - 1));
+        auto c = s.g->C(x, y);
+        if (c->text.t.length())
+        {
+            relsize = c->text.relsize;
+            break;
+        }
+    }
+}
+
+void Text::drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, bool cursoronly, int maxcolwidth)
+{
+    int ixs = 0, iys = 0;
+    if (!cell->tiny) disImgSize(ixs, iys);
+    if (ixs) ixs += 2;
+    doc->pickFont(dc, cell->depth() - doc->drawpath.size(), relsize, stylebits);
+    const auto fm = dc.fontMetrics();
+    int h = fm.height();
+    {
+        int i = 0;
+        for (int l = 0;; l++) {
+            int start = i;
+            QString ls = getLine(i, maxcolwidth);
+            int len = ls.length();
+            int end = start + len;
+
+            if (s.cursor != s.cursorend)
+            {
+                if (s.cursor <= end && s.cursorend >= start && !cursoronly)
+                {
+                    ls.resize(qMin(s.cursorend, end) - start);
+                    int x1, x2;
+                    x2 = fm.size(Qt::TextSingleLine, ls).width();
+                    ls.resize(qMax(s.cursor, start) - start);
+                    x1 = fm.size(Qt::TextSingleLine, ls).width();
+                    if (x1 != x2)
+                    {
+                        doc->cursorlastinfo.setRect(
+                                    cell->getX(doc) + x1 + 2 + ixs + _g::margin_extra,
+                                    cell->getY(doc) + l * h + 1 + cell->ycenteroff + _g::margin_extra,
+                                    x2 - x1, h - 1);
+                        Tools::drawRect(
+                                    dc, color,
+                                    doc->cursorlastinfo.x(),
+                                    doc->cursorlastinfo.y(),
+                                    doc->cursorlastinfo.width(),
+                                    doc->cursorlastinfo.height()
+            #ifdef SIMPLERENDER
+                                    ,
+                                    true
+            #endif
+                                    );
+                    }
+                }
+            }
+            else if (s.cursor >= start && s.cursor <= end)
+            {
+                ls.resize(s.cursor - start);
+                int x = fm.size(Qt::TextSingleLine, ls).width();
+                if (doc->blink)
+                {
+#ifndef SIMPLERENDER
+                    // It will blink this on/off with xwXOR set in the caller.
+                    color = 0xFFFFFF;
+#endif
+                    doc->cursorlastinfo.setRect(
+                                cell->getX(doc) + x + 1 + ixs + _g::margin_extra,
+                                cell->getY(doc) + l * h + 1 + cell->ycenteroff + _g::margin_extra,
+                                2, h - 2);
+                    Tools::drawRect(
+                                dc, color,
+                                doc->cursorlastinfo.x(),
+                                doc->cursorlastinfo.y(),
+                                doc->cursorlastinfo.width(),
+                                doc->cursorlastinfo.height());
+                }
+                break;
+            }
+
+            if (!len) break;
+        }
+    }
 }

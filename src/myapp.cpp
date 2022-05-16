@@ -250,7 +250,7 @@ QString MyApp::loadDB(const QString &filename, bool fromreload)
                     {
                         const QString &s = dis.readString();
                         if (s.isEmpty()) break;
-                        doc->tags.insert(s, true);
+                        doc->tags.append(s);
                     }
                 }
 

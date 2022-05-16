@@ -81,6 +81,7 @@ Cell *Cell::loadWhich(Tools::DataIO &dis, Cell *parent, int &numcells, int &text
         c->text.load(dis, info);
         textbytes += c->text.t.length();
         if (ts == TS_TEXT) return c;
+        // 复用 TS_GRID 开关，直落
     case TS_GRID:
         if (c->loadGrid(dis, numcells, textbytes, info))
         {
@@ -278,6 +279,65 @@ void Cell::render(Document *doc, int bx, int by, QPainter &dc, int depth, int ml
     int xoff = verticaltextandgrid ? 0 : text.extent - depth * dc.fontMetrics().height();
     /*int yoff = */text.render(doc, bx, by + ycenteroff, depth, dc, xoff, maxcolwidth);
     if (gridShown(doc)) grid->render(doc, bx, by, dc, depth);
+}
+
+void Cell::relSize(int dir, int zoomdepth)
+{
+    text.relSize(dir, zoomdepth);
+    if (grid) grid->relSize(dir, zoomdepth);
+}
+
+bool Cell::isParentOf(const Cell *c) const
+{
+    return c->p == this || (c->p && isParentOf(c->p));
+}
+
+void Cell::clear()
+{
+    DELPTR(grid);
+    text.t.clear();
+    text.image = ImagePtr();
+    reset();
+}
+
+void Cell::paste(Document *doc, const Cell *c, Selection &s)
+{
+    p->addUndo(doc);
+    resetLayout();
+    if (c->hasText())
+    {
+        if (!hasText() || !s.textEdit())
+        {
+            cellcolor = c->cellcolor;
+            textcolor = c->textcolor;
+            text.stylebits = c->text.stylebits;
+        }
+        text.insert(doc, c->text.t, s);
+    }
+    if (c->text.image) text.image = c->text.image;
+    if (c->grid)
+    {
+        auto cg = new Grid(c->grid->xs, c->grid->ys);
+        cg->cell = this;
+        c->grid->clone(cg);
+        // Note: deleting grid may invalidate c if its a child of grid, so clear it.
+        c = nullptr;
+        DELPTR(grid);  // FIXME: could merge instead?
+        grid = cg;
+        if (!hasText()) grid->mergeWithParent(p->grid, s);  // deletes grid/this.
+    }
+}
+
+Cell *Cell::clone(Cell *_parent) const
+{
+    Cell* c = new Cell(_parent, this, celltype, grid ? new Grid(grid->xs, grid->ys) : nullptr);
+    c->text = text;
+    c->text.cell = c;
+    if (grid)
+    {
+        grid->clone(c->grid);
+    }
+    return c;
 }
 
 int Cell::getX(Document *doc) const

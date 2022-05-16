@@ -4,6 +4,7 @@
 #include <QString>
 #include <QIODevice>
 #include <QColor>
+#include <QPainter>
 
 class QPainter;
 
@@ -18,8 +19,13 @@ QString bakName(const QString &filename);
 QString tmpName(const QString &filename);
 QString extName(const QString &filename, const QString &ext);
 
+void drawRect(QPainter &dc, int x, int y, int xs, int ys);
 void drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline = false);
 void drawRoundedRect(QPainter &dc, uint color, int roundness, int x, int y, int xs, int ys);
+void drawRoundedRect(QPainter &dc, int roundness, const QRect &rect);
+void drawLine(QPainter &dc, int x0, int y0, int x1, int y1);
+void drawImage(QPainter &dc, int x, int y, const QImage &img);
+void drawText(QPainter &dc, const QString &s, int x, int y, int w, int h);
 
 
 class DataIO
@@ -59,6 +65,31 @@ public:
         return dev->seek(pos);
     }
 
+};
+
+class Painter : public QPainter
+{
+#ifdef QT_DEBUG
+    Painter*_this;
+#endif
+    QPixmap*dp;
+    QWidget*widget;
+    QRect rect;
+    int needUpdate;
+
+public:
+    Painter(const QWidget*widget);
+    ~Painter();
+    void update(const QRect &rect=QRect());
+
+    inline static Painter *p(QPainter &dc)
+    {
+        Painter* _p = static_cast<Painter*>(&dc);
+#ifdef QT_DEBUG
+    Q_ASSERT(_p == _p->_this);
+#endif
+        return _p;
+    }
 };
 
 }
