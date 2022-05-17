@@ -8,6 +8,10 @@
 #include <QDebug>
 #include <QWidget>
 
+
+#define FloatToUnsigned(f)  ((quint32)(((qint32)((f) - 2147483648.0)) + 2147483647L) + 1)
+
+
 QString Tools::resolvePath(const QString &path, bool exist)
 {
     QString sp = path.isEmpty()? QStringLiteral("."): path;
@@ -114,6 +118,102 @@ double Tools::DataIO::readDouble()
         }
     }
     return (bytes[0] & 0x80)? -f: f;
+}
+
+void Tools::DataIO::writeDouble(double num)
+{
+    // USE_APPLE_IEEE
+    // useExtendedPrecision
+    char buf[10];
+    qint32 sign;
+    qint32 expon;
+    double fMant, fsMant;
+    quint32 hiMant, loMant;
+
+    if (num < 0)
+    {
+        sign = 0x8000;
+        num *= -1;
+    }
+    else
+    {
+        sign = 0;
+    }
+    if (num == 0)
+    {
+        expon = 0; hiMant = 0; loMant = 0;
+    }
+    else
+    {
+        fMant = frexp(num, &expon);
+        if ((expon > 16384) || !(fMant < 1))
+        { /* Infinity or NaN */
+            expon = sign|0x7FFF; hiMant = 0; loMant = 0; /* infinity */
+        }
+        else
+        { /* Finite */
+            expon += 16382;
+            if (expon < 0) { /* denormalized */
+                fMant = ldexp(fMant, expon);
+                expon = 0;
+            }
+            expon |= sign;
+            fMant = ldexp(fMant, 32);
+            fsMant = floor(fMant);
+            hiMant = FloatToUnsigned(fsMant);
+            fMant = ldexp(fMant - fsMant, 32);
+            fsMant = floor(fMant);
+            loMant = FloatToUnsigned(fsMant);
+        }
+    }
+
+    buf[0] = expon >> 8;
+    buf[1] = expon;
+    buf[2] = hiMant >> 24;
+    buf[3] = hiMant >> 16;
+    buf[4] = hiMant >> 8;
+    buf[5] = hiMant;
+    buf[6] = loMant >> 24;
+    buf[7] = loMant >> 16;
+    buf[8] = loMant >> 8;
+    buf[9] = loMant;
+    dev->write(buf, 10);
+}
+
+void Tools::DataIO::writeInt32(qint32 val)
+{
+    uchar buff[4];
+    if (Q_LIKELY(bo == DIO_BO_Little))
+    {
+        qToLittleEndian<qint32>(val, buff);
+    }
+    else
+    {
+        qToBigEndian<qint32>(val, buff);
+    }
+    dev->write((char*)buff, 4);
+}
+
+void Tools::DataIO::writeInt64(qint64 val)
+{
+    uchar buff[8];
+    if (Q_LIKELY(bo == DIO_BO_Little))
+    {
+        qToLittleEndian<qint64>(val, buff);
+    }
+    else
+    {
+        qToBigEndian<qint64>(val, buff);
+    }
+    dev->write((char*)buff, 8);
+}
+
+void Tools::DataIO::writeString(const QString &str)
+{
+    const auto &bs = str.toUtf8();
+    const int size = bs.size();
+    writeInt32(size);
+    if (size) write(bs.constData(), size);
 }
 
 void Tools::drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline)

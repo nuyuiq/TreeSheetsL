@@ -2,6 +2,7 @@
 #define GRID_H
 
 #include "selection.h"
+#include "image.h"
 
 #include <QVariantMap>
 
@@ -39,6 +40,7 @@ struct Grid
     Grid(int _xs, int _ys, Cell *_c = nullptr);
     ~Grid();
     bool loadContents(Tools::DataIO &dis, int &numcells, int &textbytes, QVariantMap &info);
+    void save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const;
     void initColWidths();
     void setOrient();
     Selection findCell(Cell *o);
@@ -63,8 +65,45 @@ struct Grid
     void mergeWithParent(Grid *p, Selection &s);
     QRect getRect(Document *doc, Selection &s, bool minimal = false);
     void drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, bool cursoronly);
+    void initCells(Cell *clonestylefrom = nullptr);
+    Cell* cloneSel(const Selection &s);
+    void replaceCell(Cell *o, Cell *n);
+    void imageRefCollect(QVector<ImagePtr> &imgs);
+    void maxDepthLeaves(int curdepth, int &maxdepth, int &leaves);
+    QString convertToText(const Selection &s, int indent, int format, Document *doc);
+    void collectCells(QVector<Cell *> &itercells);
+    void collectCellsSel(QVector<Cell *> &itercells, Selection &s, bool recurse);
+    Cell *findNextSearchMatch(const QString &search, Cell *best, Cell *selected, bool &lastwasselected);
+    void findReplaceAll(const QString &str);
+    void multiCellDelete(Document *doc, Selection &s);
+    void setStyle(Document *doc, Selection &s, int sb);
+    void setStyles(Selection &s, Cell *o);
+    void clearImages(Selection &s);
+    void sort(Selection &s, bool descending);
+    void replaceStr(Document *doc, const QString &str, Selection &s);
+    void setBorder(int width, Selection &s);
+    void setGridTextLayout(int ds, bool vert, bool noset, const Selection &s);
+    void transpose();
+    bool isTable();
+    void hierarchify(Document *doc);
+    void mergeRow(Grid *tm);
+    void reParent(Cell *p);
+    int flatten(int curdepth, int cury, Grid *g);
+    Selection hierarchySwap(const QString &tag);
+    Cell *findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward);
+
+
 
     inline Selection selectAll() { return Selection(this, 0, 0, xs, ys); }
+    inline QString toText(int indent, const Selection &s, int format, Document *doc)
+    {
+        Q_UNUSED(s)
+        return convertToText(selectAll(), indent + 2, format, doc);
+    }
+    inline void cloneStyleFrom(Grid *o) {
+        bordercolor = o->bordercolor;
+        // TODO: what others?
+    }
 };
 
 #endif // GRID_H

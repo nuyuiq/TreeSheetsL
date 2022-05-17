@@ -29,12 +29,6 @@ Selection::Selection(Grid *_g, int _x, int _y, int _xs, int _ys)
 void Selection::setCursorEdit(Document *doc, bool edit)
 {
     auto c = edit? Qt::IBeamCursor: Qt::ArrowCursor;
-    // TODO
-//#ifdef  WIN32
-//    // this changes the cursor instantly, but gets overridden by the local window cursor
-//    ::SetCursor((HCURSOR)c.GetHCURSOR());
-//#endif
-//    // this doesn't change the cursor immediately, only on mousemove:
     doc->sw->setCursor(c);
     firstdx = firstdy = 0;
 }
@@ -359,32 +353,32 @@ void Selection::next(Document *doc, QPainter &dc, bool backwards)
     doc->drawSelectMove(dc, *this);
 }
 
-const QChar *Selection::wrap(Document *doc)
+QString Selection::wrap(Document *doc)
 {
-    // TODO
-    return nullptr;
-//    if (thin()) return doc->NoThin();
-//    g->cell->AddUndo(doc);
-//    auto np = g->CloneSel(*this).release();
-//    g->C(x, y)->text.t = ".";  // avoid this cell getting deleted
-//    if (xs > 1) {
-//        Selection s(g, x + 1, y, xs - 1, ys);
-//        g->MultiCellDeleteSub(doc, s);
-//    }
-//    if (ys > 1) {
-//        Selection s(g, x, y + 1, 1, ys - 1);
-//        g->MultiCellDeleteSub(doc, s);
-//    }
-//    Cell *old = g->C(x, y);
-//    np->text.relsize = old->text.relsize;
-//    np->CloneStyleFrom(old);
-//    g->ReplaceCell(old, np);
-//    np->parent = g->cell;
-//    delete old;
-//    xs = ys = 1;
-//    EnterEdit(doc, maxCursor(), maxCursor());
-//    doc->refresh();
-//    return nullptr;
+    if (thin()) return doc->noThin();
+    g->cell->addUndo(doc);
+    Cell *np = g->cloneSel(*this);
+    g->C(x, y)->text.t = QStringLiteral(".");  // avoid this cell getting deleted
+    if (xs > 1)
+    {
+        Selection s(g, x + 1, y, xs - 1, ys);
+        g->multiCellDeleteSub(doc, s);
+    }
+    if (ys > 1)
+    {
+        Selection s(g, x, y + 1, 1, ys - 1);
+        g->multiCellDeleteSub(doc, s);
+    }
+    Cell *old = g->C(x, y);
+    np->text.relsize = old->text.relsize;
+    np->cloneStyleFrom(old);
+    g->replaceCell(old, np);
+    np->p = g->cell;
+    delete old;
+    xs = ys = 1;
+    enterEdit(doc, maxCursor(), maxCursor());
+    doc->refresh();
+    return QString();
 }
 
 Cell *Selection::thinExpand(Document *doc)

@@ -15,25 +15,38 @@ class QString;
 class QPainter;
 class Selection;
 
+struct UndoItem
+{
+    QVector<Selection> path, selpath;
+    Selection sel;
+    Cell* clone;
+
+
+    inline UndoItem() : clone(nullptr) { }
+    ~UndoItem();
+};
+
 struct Document
 {
     QString filename;
     QStringList tags;
     QDateTime lastmodificationtime;
+    QVector<Selection> drawpath;
+    QVector<Cell *> itercells;
+    QList<UndoItem *> undolist, redolist;
+    QRect cursorlastinfo;
+    Selection hover;
+    Selection selected;
+    Selection begindrag;
     Widget *sw;
     Cell *rootgrid;
     // for use during Render() calls
     Cell *curdrawroot;
-    Selection hover;
-    Selection selected;
-    Selection begindrag;
-    QVector<Selection> drawpath;
-    QRect cursorlastinfo;
 
     double currentviewscale;
     long lastmodsinceautosave;
     long undolistsizeatfullsave;
-    //long lastsave;
+    long lastsave;
     int originx;
     int originy;
     int maxx;
@@ -49,12 +62,15 @@ struct Document
     int laststylebits;
     int pathscalebias;
     int isctrlshiftdrag;
+    int editfilter;
+    uint printscale;
     bool modified;
-    //bool tmpsavesuccess;
+    bool tmpsavesuccess;
     bool redrawpending;
     bool while_printing;
     bool scaledviewingmode;
     bool blink;
+    bool searchfilter;
 
 
 
@@ -90,6 +106,31 @@ struct Document
     void zoom(int dir, QPainter &dc, bool fromroot = false, bool selectionmaybedrawroot = true);
     void createPath(Cell *c, QVector<Selection> &path);
     void Blink();
+    void drag(QPainter &dc);
+    bool lastUndoSameCell(Cell *c) const;
+    QString save(bool saveas, bool *success = nullptr);
+    void autoSave(bool minimized, int page);
+    QString saveDB(bool *success, bool istempfile = false, int page = -1);
+    QString exportFile(const QString &fn, int k, bool currentview);
+    QString Export(const QString &fmt, const QString &pat, const QString &msg, int k);
+    bool closeDocument();
+    bool checkForChanges();
+    QString action(QPainter &dc, int k);
+    QString tagSet(int tagno);
+    void undo(QPainter &dc, QList<UndoItem *> &fromlist, QList<UndoItem *> &tolist, bool redo = false);
+    void scrollOrZoom(QPainter &dc, bool zoomiftiny = false);
+    void zoomTiny(QPainter &dc);
+    uint pickColor(QWidget *fr, uint defcol);
+    void collectCells(Cell *c);
+    void collectCellsSel(bool recurse);
+    QString searchNext(QPainter &dc);
+    void applyEditFilter();
+    void setSearchFilter(bool on);
+    void delRowCol(int &v, int e, int gvs, int dec, int dx, int dy, int nxs, int nys);
+    void zoomOutIfNoGrid(QPainter &dc);
+    QString sort(bool descending);
+    QString layrender(int ds, bool vert, bool toggle = false, bool noset = false);
+
 
     inline void resetCursor() { if (selected.g) selected.setCursorEdit(this, selected.textEdit()); }
     inline void refreshReset() { refresh(); }

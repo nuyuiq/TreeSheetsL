@@ -23,11 +23,13 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QFileSystemWatcher>
-#include <QEvent>
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     myApp.frame = this;
+    fromclosebox = true;
+    zenmode = false;
     initUI();
     watcher = new QFileSystemWatcher(this);
     connect(watcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::fileChanged);
@@ -38,8 +40,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
-    killTimer(savechecker);
-    killTimer(blinkTimer);
+    if (savechecker) killTimer(savechecker);
+    if (blinkTimer) killTimer(blinkTimer);
 }
 
 Widget *MainWindow::createWidget(bool append)
@@ -59,20 +61,146 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
     bool b = reason == (myApp.cfg->singletray?
                             QSystemTrayIcon::Trigger:
                             QSystemTrayIcon::DoubleClick);
-    if (!b) return;
-
-    qDebug() << reason;
+    if (b) deIconize();
 }
 
 void MainWindow::actionActivated()
 {
+    Widget *sw = getCurTab();
+    QAction *action = qobject_cast<QAction*>(sender());
+    auto Check = [&](const char *cfg, bool *var = nullptr)
+    {
+        if (action)
+        {
+            bool b;
+            if (!var) var = &b;
+            *var = action->isChecked();
+            myApp.cfg->write(QString::fromLatin1(cfg), *var);
+            sw->status(tr("change will take effect next run of TreeSheets"));
+        }
+    };
     int kid = sender()->property("kid").toInt();
-    qDebug() << "shortcut:" << kid;
+    switch (kid)
+    {
+    case A_NOP: break;
+    case A_ALEFT: sw->cursorScroll(-_g::scrollratecursor, 0); break;
+    case A_ARIGHT: sw->cursorScroll(_g::scrollratecursor, 0); break;
+    case A_AUP: sw->cursorScroll(0, -_g::scrollratecursor); break;
+    case A_ADOWN: sw->cursorScroll(0, _g::scrollratecursor); break;
+
+    case A_ICONSET:   Check("iconset"); break;
+    case A_SHOWSBAR:  Check("showsbar"); break;
+    case A_SHOWTBAR:  Check("showtbar"); break;
+    case A_LEFTTABS:  Check("lefttabs"); break;
+    case A_SINGLETRAY:Check("singletray"); break;
+    case A_MAKEBAKS:  Check("makebaks", &myApp.cfg->makebaks); break;
+    case A_TOTRAY:    Check("totray", &myApp.cfg->totray); break;
+    case A_MINCLOSE:  Check("minclose", &myApp.cfg->minclose); break;
+    case A_ZOOMSCR:   Check("zoomscroll", &myApp.cfg->zoomscroll); break;
+    case A_THINSELC:  Check("thinselc", &myApp.cfg->thinselc); break;
+    case A_AUTOSAVE:  Check("autosave", &myApp.cfg->autosave); break;
+    case A_CENTERED:  Check("centered", &myApp.cfg->centered); update(); break;
+    case A_FSWATCH:   Check("fswatch", &myApp.cfg->fswatch); break;
+    case A_AUTOEXPORT:Check("autohtmlexport", &myApp.cfg->autohtmlexport); break;
+    case A_FASTRENDER:Check("fastrender", &myApp.cfg->fastrender); update(); break;
+    case A_FULLSCREEN:
+        if (isFullScreen()) showNormal();
+        else
+        {
+            showFullScreen();
+            sw->status(tr("Press F11 to exit fullscreen mode."));
+        }
+        break;
+    case A_ZEN_MODE:
+        if (!isFullScreen())
+        {
+            if (tb != nullptr) tb->setVisible(zenmode);
+            if (sb != nullptr) sb->setVisible(zenmode);
+            this->resize(size()); // TODO
+            this->update();
+            if (tb != nullptr) tb->update();
+            if (sb != nullptr) sb->update();
+            zenmode = !zenmode;
+        }
+        break;
+    case A_SEARCHF:
+        if (filter)
+        {
+            filter->setFocus();
+            filter->selectAll();
+        }
+        else
+        {
+            sw->status(tr("Please enable (Options -> Show Toolbar) to use search."));
+        }
+        break;
+    case A_EXIT:
+        fromclosebox = false;
+        myApp.frame->close();
+        break;
+    case A_CLOSE:
+    {
+        Tools::Painter dc(sw);
+        sw->doc->shiftToCenter(dc);
+        sw->doc->action(dc, kid); break;  // sw dangling pointer on return
+    }
+    default:
+        if (kid >= A_FILEHIS0 && kid <= A_FILEHIS0 + 8)
+        {
+            const QString &fn = myApp.fhistory->getHistoryFile(kid - A_FILEHIS0);
+            sw->status(myApp.open(fn));
+        }
+        else if (kid >= A_TAGSET && kid < A_SCRIPT)
+        {
+            sw->status(sw->doc->tagSet(kid - A_TAGSET));
+        }
+        else if (kid >= A_SCRIPT && kid < A_MAXACTION)
+        {
+            const QString &sf = myApp.cfg->scriptsInMenu.at(kid - A_SCRIPT);
+            // TODO
+            qDebug() << "script run :" << sf;
+            sw->status(QString("scrip run(todo)"));
+//            auto msg = tssi.ScriptRun(sf);
+//            msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
+//            sw->status(wxString(msg));
+        }
+        else
+        {
+            Tools::Painter dc(sw);
+            sw->doc->shiftToCenter(dc);
+            sw->status(sw->doc->action(dc, kid));
+        }
+    }
 }
 
 void MainWindow::fileChanged(const QString &path)
 {
+    // TODO
     qDebug() << path;
+}
+
+void MainWindow::tabClose(int idx)
+{
+    if (nb->count() <= 1) return;
+    Widget *sw = getTabByIndex(idx);
+    if (sw->doc->closeDocument())
+    {
+        return;
+    }
+    auto wid = nb->widget(idx);
+    nb->removeTab(idx);
+    wid->deleteLater();
+    myApp.fhistory->rememberOpenFiles();
+}
+
+void MainWindow::tabChange(int idx)
+{
+    if (idx != -1)
+    {
+        Widget *sw = getTabByIndex(idx);
+        sw->status(QString());
+        sw->doc->updateFileName();
+    }
 }
 
 void MainWindow::appendSubMenu(
@@ -122,6 +250,33 @@ void MainWindow::updateStatus(const Selection &s)
     sbl[1]->setText(tr("Edited %1").arg(c->text.lastedit.toString(Qt::SystemLocaleShortDate)));
 }
 
+void MainWindow::deIconize()
+{
+    if (!isHidden())
+    {
+        // TODO
+        // RequestUserAttention();
+        return;
+    }
+    show();
+    trayIcon->hide();
+}
+
+void MainWindow::tabsReset()
+{
+    for (int i = 0; i < nb->count(); i++)
+    {
+        getTabByIndex(i)->doc->rootgrid->resetChildren();
+    }
+}
+
+void MainWindow::cycleTabs(int offset)
+{
+    auto numtabs = nb->count();
+    offset = ((offset >= 0) ? 1 : numtabs - 1);  // normalize to non-negative wrt modulo
+    nb->setCurrentIndex((nb->currentIndex() + offset) % numtabs);
+}
+
 void MainWindow::fileChangeWatch(const QString &file)
 {
     watcher->addPath(file);
@@ -152,6 +307,12 @@ Widget *MainWindow::getTabByIndex(int i) const
     auto win = qobject_cast<Widget*>(sa->widget());
     Q_ASSERT(win);
     return win;
+}
+
+Widget *MainWindow::getCurTab()
+{
+    int idx = nb->currentIndex();
+    return idx >= 0? getTabByIndex(nb->currentIndex()): nullptr;
 }
 
 void MainWindow::setPageTitle(const QString &fn, const QString &mods, int page)
@@ -195,6 +356,7 @@ void MainWindow::initUI()
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
             this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
     trayIcon->setIcon(QIcon(imgspath + ICON_FILEPATH));
+    trayIcon->setToolTip(tr("TreeSheets"));
 
     {
         QString p = Tools::resolvePath(QStringLiteral("images/nuvola/fold.png"), true);
@@ -636,6 +798,7 @@ void MainWindow::initUI()
     QMenu *helpmenu = new QMenu(tr("&Help"), this);
     {
         appendSubMenu(helpmenu, A_ABOUT, tr("&About..."));
+        appendSubMenu(helpmenu, A_ABOUTQT, tr("&About Qt..."));
         appendSubMenu(helpmenu, A_HELPI, tr("Load interactive &tutorial...\tF1"));
         appendSubMenu(helpmenu, A_HELP_OP_REF, tr("Load operation reference...\tCTRL+ALT+F1"));
         appendSubMenu(helpmenu, A_HELP, tr("View tutorial &web page..."));
@@ -663,7 +826,7 @@ void MainWindow::initUI()
     const QString &toolbgcol = iconset ? QStringLiteral(TOOL_BGCOLOR0) : QStringLiteral(TOOL_BGCOLOR1);
     if (showtbar || mergetbar)
     {
-        QToolBar *tb = new QToolBar(this);
+        tb = new QToolBar(this);
         tb->setMovable(false);
 
         tb->setStyleSheet(QStringLiteral("QToolBar{background: %1;}").arg(toolbgcol));
@@ -745,9 +908,10 @@ void MainWindow::initUI()
 
         addToolBar(Qt::TopToolBarArea, tb);
     }
+    else tb = nullptr;
 
     if (showsbar) {
-        QStatusBar *sb = new QStatusBar(this);
+        sb = new QStatusBar(this);
         sb->setStyleSheet(QStringLiteral("QStatusBar{background: %1;}").arg(toolbgcol));
 
         sb->addWidget(sbl[0] = new QLabel, 1);
@@ -764,6 +928,7 @@ void MainWindow::initUI()
     }
     else
     {
+        sb = nullptr;
         sbl[0] = nullptr;
         sbl[1] = nullptr;
         sbl[2] = nullptr;
@@ -771,9 +936,11 @@ void MainWindow::initUI()
     }
     nb = new QTabWidget(this);
     nb->setMovable(true);
+    nb->setTabsClosable(true);
     setCentralWidget(nb);
     nb->setTabPosition(QTabWidget::South);
-    nb->setFocus();
+    connect(nb, SIGNAL(tabCloseRequested(int)), this, SLOT(tabClose(int)));
+    connect(nb, SIGNAL(currentChanged(int)), this, SLOT(tabChange(int)));
 
     auto desktop = QApplication::desktop();
     QRect clientRect = desktop->availableGeometry(desktop->screenNumber(this));
@@ -815,8 +982,33 @@ void MainWindow::initUI()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    // TODO
-    // if close
+    bool fcb = fromclosebox;
+    fromclosebox = true;
+    if (fcb && myApp.cfg->minclose)
+    {
+        event->ignore();
+        trayIcon->show();
+        hide();
+        return;
+    }
+    while (nb->count())
+    {
+        if (getCurTab()->doc->closeDocument())
+        {
+            event->ignore();
+            // may have closed some, but not all
+            myApp.fhistory->rememberOpenFiles();
+            return;
+        }
+        else
+        {
+            auto wid = nb->currentWidget();
+            nb->removeTab(nb->currentIndex());
+            wid->deleteLater();
+        }
+    }
+
+    myApp.fhistory->rememberOpenFiles();
     if (!isHidden())
     {
         bool isM = isMaximized();
@@ -844,8 +1036,14 @@ void MainWindow::timerEvent(QTimerEvent *event)
         Q_ASSERT(widget);
         widget->doc->Blink();
     }
-    else if (savechecker)
+    else if (tid == savechecker)
     {
-        // TODO
+        for (int i = 0; i < nb->count(); i++)
+        {
+            Widget *widget = getTabByIndex(i);
+            Q_ASSERT(widget);
+            widget->doc->autoSave(!myApp.frame->isActiveWindow(), i);
+        }
+
     }
 }

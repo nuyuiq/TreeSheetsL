@@ -63,6 +63,10 @@ void Config::reset()
     pen_tinygridlines = 0xf2dcd8;
     pen_gridlines = 0xe5b7b0;
     pen_thinselect = 0xc0c0c0;
+
+    lastcellcolor = 0xFFFFFF;
+    lasttextcolor = 0;
+    lastbordcolor = 0xA0A0A0;
 }
 
 

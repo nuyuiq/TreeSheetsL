@@ -35,15 +35,21 @@ class DataIO
 public:
     DataIO(QIODevice*dev) : dev(dev), bo(DIO_BO_Little) {}
     inline void setByteOrder(DIO_BO bo) { this->bo = bo; }
+    inline QIODevice *d() const { return dev; }
+    inline qint64 pos()
+    {
+        return dev->pos();
+    }
+    inline bool seek(qint64 pos)
+    {
+        return dev->seek(pos);
+    }
 
     QString readString();
     qint8 readInt8();
     qint32 readInt32();
     qint64 readInt64();
     double readDouble();
-
-
-    inline QIODevice *d() const { return dev; }
     inline qint64 read(char *data, qint64 maxlen)
     {
         return dev->read(data, maxlen);
@@ -56,14 +62,16 @@ public:
     {
         return dev->readAll();
     }
-    inline qint64 pos()
+
+    void writeDouble(double num);
+    inline qint64 write(const char *data, qint64 len)
     {
-        return dev->pos();
+        return dev->write(data, len);
     }
-    inline bool seek(qint64 pos)
-    {
-        return dev->seek(pos);
-    }
+    inline void writeInt8(char val) { dev->write(&val, 1); }
+    void writeInt32(qint32 val);
+    void writeInt64(qint64 val);
+    void writeString(const QString &str);
 
 };
 
@@ -98,6 +106,7 @@ public:
 class Color : public QColor
 {
 public:
+    inline Color(const QColor &other) : QColor(other) { }
     inline Color(uint bgr): QColor(uchar(bgr), uchar(bgr>>8), uchar(bgr>>16)) { }
     inline uint toBGR() const { return blue() * 256 * 256 + green() * 256 + red(); }
 };

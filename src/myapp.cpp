@@ -9,6 +9,7 @@
 #include "document.h"
 #include "cell.h"
 #include "widget.h"
+#include "grid.h"
 
 #include <QLocale>
 #include <QTranslator>
@@ -24,7 +25,7 @@
 MyApp myApp;
 
 //! 加载示例、教程
-static void loadTut()
+void MyApp::loadTut()
 {
     const auto &lang = QLocale::system().name().left(2);
     QString fn = Tools::resolvePath(QStringLiteral("examples/tutorial-%1.cts").arg(lang), false);
@@ -33,6 +34,12 @@ static void loadTut()
         myApp.loadDB(Tools::resolvePath(QStringLiteral("examples/tutorial.cts"), false), false);
     }
 }
+
+void MyApp::loadOpRef()
+{
+    myApp.loadDB(Tools::resolvePath(QStringLiteral("examples/operation-reference.cts"), false), false);
+}
+
 
 // 启动时初始化打开文档
 static void docInit(const QString &filename)
@@ -52,7 +59,7 @@ static void docInit(const QString &filename)
         }
     }
 
-    if (!myApp.frame->nb->count()) loadTut();
+    if (!myApp.frame->nb->count()) MyApp::loadTut();
 
     if (!myApp.frame->nb->count()) myApp.initDB(10);
 
@@ -130,7 +137,6 @@ void MyApp::relese()
 // 加载本地文件
 QString MyApp::loadDB(const QString &filename, bool fromreload)
 {
-    // TODO
     QString fn = filename;
     bool loadedfromtmp = false;
 
@@ -278,15 +284,13 @@ QString MyApp::loadDB(const QString &filename, bool fromreload)
 
 Cell *MyApp::initDB(int sizex, int sizey)
 {
-    // TODO
-
-    return nullptr;
-//    Cell *c = new Cell(nullptr, nullptr, CT_DATA, new Grid(sizex, sizey ? sizey : sizex));
-//    c->cellcolor = 0xCCDCE2;
-//    c->grid->InitCells();
-//    Document *doc = NewTabDoc();
-//    doc->InitWith(c, L"");
-    //    return doc->rootgrid;
+    Cell *c = new Cell(nullptr, nullptr, CT_DATA, new Grid(sizex, sizey ? sizey : sizex));
+    c->cellcolor = 0xCCDCE2;
+    c->grid->initCells();
+    Widget*widget = myApp.frame->createWidget(false);
+    Document *doc = widget->doc;
+    doc->initWith(c, QString());
+    return doc->rootgrid;
 }
 
 ImagePtr MyApp::wrapImage(const Image &img)
@@ -324,6 +328,74 @@ void MyApp::fileUsed(const QString &filename, Document *doc)
         const QString &d = fi.absoluteFilePath();
         frame->fileChangeWatch(d);
     }
+}
+
+QString MyApp::open(const QString &fn)
+{
+    if (!fn.isEmpty())
+    {
+        const QString &msg = loadDB(fn, false);
+        if (!msg.isEmpty())
+        {
+            QMessageBox::information(frame, fn, msg);
+        }
+        return msg;
+    }
+    return tr("Open file cancelled.");
+}
+
+QString MyApp::import(int k)
+{
+    // TODO
+//    wxString fn = ::wxFileSelector(_(L"Please select file to import:"), L"", L"", L"", L"*.*",
+//                                   wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_CHANGE_DIR);
+//    if (!fn.empty()) {
+//        wxBusyCursor wait;
+//        switch (k) {
+//        case A_IMPXML:
+//        case A_IMPXMLA: {
+//            wxXmlDocument doc;
+//            if (!doc.Load(fn)) goto problem;
+//            Cell *&r = InitDB(1);
+//            Cell *c = *r->grid->cells;
+//            FillXML(c, doc.GetRoot(), k == A_IMPXMLA);
+//            if (!c->HasText() && c->grid) {
+//                *r->grid->cells = nullptr;
+//                delete r;
+//                r = c;
+//                c->parent = nullptr;
+//            }
+//            break;
+//        }
+//        case A_IMPTXTI:
+//        case A_IMPTXTC:
+//        case A_IMPTXTS:
+//        case A_IMPTXTT: {
+//            wxFFile f(fn);
+//            if (!f.IsOpened()) goto problem;
+//            wxString s;
+//            if (!f.ReadAll(&s)) goto problem;
+//            const wxArrayString &as = wxStringTokenize(s, LINE_SEPERATOR);
+
+//            if (as.size()) switch (k) {
+//            case A_IMPTXTI: {
+//                Cell *r = InitDB(1);
+//                FillRows(r->grid, as, CountCol(as[0]), 0, 0);
+//            }; break;
+//            case A_IMPTXTC: InitDB(1, (int)as.size())->grid->CSVImport(as, L','); break;
+//            case A_IMPTXTS: InitDB(1, (int)as.size())->grid->CSVImport(as, L';'); break;
+//            case A_IMPTXTT: InitDB(1, (int)as.size())->grid->CSVImport(as, L'\t'); break;
+//            }
+//            break;
+//        }
+//        }
+//        frame->GetCurTab()->doc->ChangeFileName(fn.Find(L'.') >= 0 ? fn.BeforeLast(L'.') : fn, true);
+//        frame->GetCurTab()->doc->ClearSelectionRefresh();
+//    }
+//    return nullptr;
+//problem:
+//    wxMessageBox(_(L"couldn't import file!"), fn, wxOK, frame);
+    return tr("File load error.");
 }
 
 // 加载翻译文件

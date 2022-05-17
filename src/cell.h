@@ -65,6 +65,7 @@ struct Cell
     ~Cell();
     void cloneStyleFrom(Cell const *o);
     bool loadGrid(Tools::DataIO &dis, int &numcells, int &textbytes, QVariantMap &info);
+    void save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const;
     int colWidth();
     int depth() const;
     Cell *parent(int i);
@@ -86,6 +87,19 @@ struct Cell
     void clear();
     void paste(Document *doc, const Cell *c, Selection &s);
     Cell* clone(Cell *_parent) const;
+    void imageRefCollect(QVector<ImagePtr> &imgs);
+    void maxDepthLeaves(int curdepth, int &maxdepth, int &leaves);
+    QString toText(int indent, const Selection &s, int format, Document *doc);
+    void collectCells(QVector<Cell *> &itercells, bool recurse = true);
+    Cell *findNextSearchMatch(const QString &search, Cell *best, Cell *selected, bool &lastwasselected);
+    void findReplaceAll(const QString &str);
+    Grid *addGrid(int x = 1, int y = 1);
+    void setBorder(int width);
+    void setGridTextLayout(int ds, bool vert, bool noset);
+    Cell *findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch,
+                    bool forward);
+
+
 
     inline bool hasText() const { return !text.t.isEmpty(); }
     inline bool hasTextSize() const { return hasText() || text.relsize; }

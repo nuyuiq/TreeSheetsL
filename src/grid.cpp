@@ -102,9 +102,23 @@ bool Grid::loadContents(Tools::DataIO &dis, int &numcells, int &textbytes, QVari
     return true;
 }
 
+void Grid::save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const
+{
+    dos.writeInt32(xs);
+    dos.writeInt32(ys);
+    dos.writeInt32(bordercolor);
+    dos.writeInt32(user_grid_outer_spacing);
+    dos.writeInt8(cell->verticaltextandgrid);
+    dos.writeInt8(folded);
+    for (int x = 0; x < xs; x++)
+    {
+        dos.writeInt32(colwidths[x]);
+    }
+    foreachcell(c) c->save(dos, imgs);
+}
+
 void Grid::initColWidths()
 {
-    // TODO
     if (colwidths) delete[] colwidths;
     colwidths = new int[xs];
     int cw = cell ? cell->colWidth() : myApp.cfg->defaultmaxcolwidth;
@@ -759,4 +773,324 @@ void Grid::drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, boo
     {
         c->text.drawCursor(doc, dc, s, color, cursoronly, colwidths[s.x]);
     }
+}
+
+void Grid::initCells(Cell *clonestylefrom)
+{
+    foreachcell(c) c = new Cell(cell, clonestylefrom);
+}
+
+Cell *Grid::cloneSel(const Selection &s)
+{
+    auto cl = new Cell(nullptr, s.g->cell, CT_DATA, new Grid(s.xs, s.ys));
+    foreachcellinsel(c, s) cl->grid->C(x - s.x, y - s.y) = c->clone(cl);
+    return cl;
+}
+
+void Grid::replaceCell(Cell *o, Cell *n)
+{
+    foreachcell(c) if (c == o) c = n;
+}
+
+void Grid::imageRefCollect(QVector<ImagePtr> &imgs)
+{
+    foreachcell(c) c->imageRefCollect(imgs);
+}
+
+void Grid::maxDepthLeaves(int curdepth, int &maxdepth, int &leaves)
+{
+    foreachcell(c) c->maxDepthLeaves(curdepth, maxdepth, leaves);
+}
+
+static void formatter(QString &r, int format, int indent, const QString &xml, const QString &html, const QString &htmlb)
+{
+    const QString sp(indent, QChar::fromLatin1(' '));
+    if (format == A_EXPXML)
+    {
+        r.append(sp);
+        r.append(xml);
+    }
+    else if (format == A_EXPHTMLT)
+    {
+        r.append(sp);
+        r.append(html);
+    }
+    else if (format == A_EXPHTMLB && !htmlb.isEmpty())
+    {
+        r.append(sp);
+        r.append(htmlb);
+    }
+}
+
+QString Grid::convertToText(const Selection &s, int indent, int format, Document *doc)
+{
+    QString r;
+    const int root_grid_spacing = 2;  // Can't be adjusted in editor, so use a default.
+    const int font_size = 14 - indent / 2;
+    const int grid_border_width =
+            cell == doc->rootgrid ?
+                root_grid_spacing : user_grid_outer_spacing - 1;
+    const QString &html = QStringLiteral("<table style=\"border-width: %1pt; font-size: %2pt;\">\n");
+    const QString &htmlb = QStringLiteral("<ul style=\"font-size: %1pt;\">\n");
+
+    formatter(r, format, indent,
+              QStringLiteral("<grid>\n"),
+              html.arg(grid_border_width).arg(font_size),
+              htmlb.arg(font_size));
+    foreachcellinsel(c, s)
+    {
+        if (x == 0)
+        {
+            formatter(r, format, indent, QStringLiteral("<row>\n"), QStringLiteral("<tr valign=top>\n"), QString());
+        }
+        r.append(c->toText(indent, s, format, doc));
+        if (format == A_EXPCSV) r.append(QChar::fromLatin1(x == xs - 1 ? '\n' : ','));
+        if (x == xs - 1)
+        {
+            formatter(r, format, indent, QStringLiteral("</row>\n"), QStringLiteral("</tr>\n"), QString());
+        }
+    }
+    formatter(r, format, indent, QStringLiteral("</grid>\n"), QStringLiteral("</table>\n"), QStringLiteral("</ul>\n"));
+    return r;
+}
+
+void Grid::collectCells(QVector<Cell *> &itercells)
+{
+    foreachcell(c) c->collectCells(itercells);
+}
+
+void Grid::collectCellsSel(QVector<Cell *> &itercells, Selection &s, bool recurse)
+{
+    foreachcellinsel(c, s) c->collectCells(itercells, recurse);
+}
+
+Cell *Grid::findNextSearchMatch(const QString &search, Cell *best, Cell *selected, bool &lastwasselected)
+{
+    foreachcell(c) best = c->findNextSearchMatch(search, best, selected, lastwasselected);
+    return best;
+}
+
+void Grid::findReplaceAll(const QString &str)
+{
+    foreachcell(c) c->findReplaceAll(str);
+}
+
+void Grid::multiCellDelete(Document *doc, Selection &s)
+{
+    cell->addUndo(doc);
+    multiCellDeleteSub(doc, s);
+    doc->refresh();
+}
+
+void Grid::setStyle(Document *doc, Selection &s, int sb)
+{
+    cell->addUndo(doc);
+    cell->resetChildren();
+    // TODO
+    foreachcellinsel(c, s) c->text.stylebits ^= sb;
+    doc->refresh();
+}
+
+void Grid::setStyles(Selection &s, Cell *o)
+{
+    foreachcellinsel(c, s)
+    {
+        c->cellcolor = o->cellcolor;
+        c->textcolor = o->textcolor;
+        c->text.stylebits = o->text.stylebits;
+        c->text.image = o->text.image;
+    }
+}
+
+void Grid::clearImages(Selection &s)
+{
+    foreachcellinsel(c, s) c->text.image.clear();
+}
+
+void Grid::sort(Selection &s, bool descending)
+{
+    // TODO
+//    int sortcolumn = s.x;
+//    int sortxs = xs;
+//    int sortdescending = descending;
+//    auto sortfunc = [&](const Cell **a, const Cell **b) {
+//        for (int i = 0; i < sortxs; i++)
+//        {
+//            int off = (i + sortcolumn) % sortxs;
+//            int cmp = (*(a + off))->text.t.CmpNoCase((*(b + off))->text.t);
+//            if (cmp) return sortdescending ? -cmp : cmp;
+//        }
+//        return 0;
+//    };
+
+//    qsort(cells + s.y * xs, s.ys, sizeof(Cell *) * xs, sortfunc);
+}
+
+void Grid::replaceStr(Document *doc, const QString &str, Selection &s)
+{
+    cell->addUndo(doc);
+    cell->resetChildren();
+    foreachcellinsel(c, s) c->text.replaceStr(str);
+    doc->refresh();
+}
+
+void Grid::setBorder(int width, Selection &s)
+{
+    foreachcellinsel(c, s) c->setBorder(width);
+}
+
+void Grid::setGridTextLayout(int ds, bool vert, bool noset, const Selection &s)
+{
+    foreachcellinsel(c, s) c->setGridTextLayout(ds, vert, noset);
+}
+
+void Grid::transpose()
+{
+    Cell **tr = new Cell *[xs * ys];
+    foreachcell(c) tr[y + x * ys] = c;
+    delete[] cells;
+    cells = tr;
+    qSwap(xs, ys);
+    setOrient();
+    initColWidths();
+}
+
+bool Grid::isTable()
+{
+    foreachcell(c) if (c->grid) return false;
+    return true;
+}
+
+void Grid::hierarchify(Document *doc)
+{
+    for (int y = 0; y < ys; y++)
+    {
+        QScopedPointer<Cell> rest;
+        if (xs > 1)
+        {
+            Selection s(this, 1, y, xs - 1, 1);
+            rest.reset(cloneSel(s));
+        }
+        Cell *c = C(0, y);
+        for (int prevy = 0; prevy < y; prevy++)
+        {
+            Cell *prev = C(0, prevy);
+            if (prev->text.t == c->text.t)
+            {
+                if (rest)
+                {
+                    Q_ASSERT(prev->grid);
+                    prev->grid->mergeRow(rest->grid);
+                    rest.reset();
+                }
+
+                Selection s(this, 0, y, xs, 1);
+                multiCellDeleteSub(doc, s);
+                y--;
+
+                goto done;
+            }
+        }
+        if (rest)
+        {
+            qSwap(c->grid, rest->grid);
+            c->grid->reParent(c);
+        }
+done:;
+    }
+    Selection s(this, 1, 0, xs - 1, ys);
+    multiCellDeleteSub(doc, s);
+    foreachcell(c) if (c->grid && c->grid->xs > 1) c->grid->hierarchify(doc);
+}
+
+void Grid::mergeRow(Grid *tm)
+{
+    Q_ASSERT(xs == tm->xs && tm->ys == 1);
+    insertCells(-1, ys, 0, 1, nullptr);
+    for (int x = 0; x < xs; x++)
+    {
+        qSwap(C(x, ys - 1), tm->C(x, 0));
+        C(x, ys - 1)->p = cell;
+    }
+}
+
+void Grid::reParent(Cell *p)
+{
+    cell = p;
+    foreachcell(c) c->p = p;
+}
+
+int Grid::flatten(int curdepth, int cury, Grid *g)
+{
+    foreachcell(c) if (c->grid)
+    {
+        cury = c->grid->flatten(curdepth + 1, cury, g);
+    }
+    else
+    {
+        Cell *ic = c;
+        for (int i = curdepth; i >= 0; i--)
+        {
+            Cell *dest = g->C(i, cury);
+            dest->text = ic->text;
+            dest->text.cell = dest;
+            ic = ic->p;
+        }
+        cury++;
+    }
+    return cury;
+}
+
+Selection Grid::hierarchySwap(const QString &tag)
+{
+    return Selection();
+//    Cell *selcell = nullptr;
+//    bool done = false;
+//lookformore:
+//    foreachcell(c) if (c->grid && !done) {
+//        Cell *f = c->grid->findExact(tag);
+//        if (f) {
+//            // add all parent tags as extra hierarchy inside the cell
+//            for (Cell *p = f->parent; p != cell; p = p->parent) {
+//                // Special case check: if parents have same name, this would cause infinite
+//                // swapping.
+//                if (p->text.t == tag) done = true;
+//                Cell *t = new Cell(f, p);
+//                t->text = p->text;
+//                t->text.cell = t;
+//                t->grid = f->grid;
+//                if (t->grid) t->grid->ReParent(t);
+//                f->grid = new Grid(1, 1);
+//                f->grid->cell = f;
+//                *f->grid->cells = t;
+//            }
+//            // remove cell from parent, recursively if parent becomes empty
+//            for (Cell *r = f; r && r != cell; r = r->parent->grid->DeleteTagParent(r, cell, f))
+//                ;
+//            // merge newly constructed hierarchy at this level
+//            if (!*cells) {
+//                *cells = f;
+//                f->parent = cell;
+//                selcell = f;
+//            } else {
+//                MergeTagCell(f, selcell);
+//            }
+//            goto lookformore;
+//        }
+//    }
+//    Q_ASSERT(selcell);
+//    return findCell(selcell);
+}
+
+Cell *Grid::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward)
+{
+    if (forward)
+    {
+        foreachcell(c) best = c->findLink(s, link, best, lastthis, stylematch, forward);
+    }
+    else
+    {
+        foreachcellrev(c) best = c->findLink(s, link, best, lastthis, stylematch, forward);
+    }
+    return best;
 }

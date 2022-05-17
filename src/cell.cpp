@@ -57,14 +57,37 @@ bool Cell::loadGrid(Tools::DataIO &dis, int &numcells, int &textbytes, QVariantM
     return ret;
 }
 
+void Cell::save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const
+{
+    dos.writeInt8(celltype);
+    dos.writeInt32(cellcolor);
+    dos.writeInt32(textcolor);
+    dos.writeInt8(drawstyle);
+    if (hasTextState())
+    {
+        dos.writeInt8(grid ? TS_BOTH : TS_TEXT);
+        text.save(dos, imgs);
+        if (grid) grid->save(dos, imgs);
+    }
+    else if (grid)
+    {
+        dos.writeInt8(TS_GRID);
+        grid->save(dos, imgs);
+    }
+    else
+    {
+        dos.writeInt8(TS_NEITHER);
+    }
+}
+
 int Cell::colWidth()
 {
     return p ? p->grid->colwidths[p->grid->findCell(this).x]
             : myApp.cfg->defaultmaxcolwidth;
-}
+    }
 
-Cell *Cell::loadWhich(Tools::DataIO &dis, Cell *parent, int &numcells, int &textbytes, QVariantMap &info)
-{
+    Cell *Cell::loadWhich(Tools::DataIO &dis, Cell *parent, int &numcells, int &textbytes, QVariantMap &info)
+    {
     Cell *c = new Cell(parent, nullptr, dis.readInt8());
     numcells++;
     int version = info.value(QStringLiteral("version")).toInt();
@@ -338,6 +361,185 @@ Cell *Cell::clone(Cell *_parent) const
         grid->clone(c->grid);
     }
     return c;
+}
+
+void Cell::imageRefCollect(QVector<ImagePtr> &imgs)
+{
+    if (grid) grid->imageRefCollect(imgs);
+    if (text.image.data() && !imgs.contains(text.image))
+    {
+        imgs.append(text.image);
+    }
+}
+
+void Cell::maxDepthLeaves(int curdepth, int &maxdepth, int &leaves)
+{
+    if (curdepth > maxdepth) maxdepth = curdepth;
+    if (grid) grid->maxDepthLeaves(curdepth + 1, maxdepth, leaves);
+    else leaves++;
+}
+
+static uint swapColor(uint c)
+{
+    return ((c & 0xFF) << 16) | (c & 0xFF00) | ((c & 0xFF0000) >> 16);
+}
+
+QString Cell::toText(int indent, const Selection &s, int format, Document *doc)
+{
+    QString str = text.toText(indent, s, format);
+    if (format == A_EXPCSV)
+    {
+        if (grid) return grid->toText(indent, s, format, doc);
+        str.replace(QChar::fromLatin1('"'), QStringLiteral("\"\""));
+        return QStringLiteral("\"%1\"").arg(str);
+    }
+    if (s.cursor != s.cursorend) return str;
+    const QString sp(indent, QChar::fromLatin1(' '));
+    str.append('\n');
+    if (grid) str.append(grid->toText(indent, s, format, doc));
+    if (format == A_EXPXML)
+    {
+        str.prepend(">");
+        if (text.relsize)
+        {
+            str.prepend("\"");
+            str.prepend(QString::number(-text.relsize));
+            str.prepend(" relsize=\"");
+        }
+        if (text.stylebits)
+        {
+            str.prepend("\"");
+            str.prepend(QString::number(text.stylebits));
+            str.prepend(" stylebits=\"");
+        }
+        if (cellcolor != doc->background())
+        {
+            str.prepend("\"");
+            str.prepend(QString::number(cellcolor));
+            str.prepend(" colorbg=\"");
+        }
+        if (textcolor != 0x000000)
+        {
+            str.prepend("\"");
+            str.prepend(QString::number(textcolor));
+            str.prepend(" colorfg=\"");
+        }
+        if (celltype != CT_DATA)
+        {
+            str.prepend("\"");
+            str.prepend(QString::number(celltype));
+            str.prepend(" type=\"");
+        }
+        str.prepend("<cell");
+        str.append(sp);
+        str.append("</cell>\n");
+    }
+    else if (format == A_EXPHTMLT)
+    {
+        QString style;
+        if (text.stylebits & STYLE_BOLD) style += "font-weight: bold;";
+        if (text.stylebits & STYLE_ITALIC) style += "font-style: italic;";
+        if (text.stylebits & STYLE_FIXED) style += "font-family: monospace;";
+        if (text.stylebits & STYLE_UNDERLINE) style += "text-decoration: underline;";
+        if (cellcolor != doc->background())
+            style += QString().sprintf("background-color: #%06X;", swapColor(cellcolor));
+        if (textcolor != 0x000000)
+            style += QString().sprintf("color: #%06X;", swapColor(textcolor));
+        str.prepend(QStringLiteral("<td style=\"%1\">").arg(style));
+        str.append(sp);
+        str.append("</td>\n");
+    }
+    else if (format == A_EXPHTMLB && (text.t.length() || grid) && this != doc->curdrawroot)
+    {
+        str.prepend("<li>");
+        str.append(sp);
+        str.append(QString::fromLatin1("</li>\n"));
+    } else if (format == A_EXPHTMLO && text.t.length())
+    {
+        QString h = QString::fromLatin1("h") + QChar::fromLatin1('0' + (indent / 2)) + QString::fromLatin1(">");
+        str.prepend(QString::fromLatin1("<") + h);
+        str.append(sp);
+        str.append(QString::fromLatin1("</") + h + QString::fromLatin1("\n"));
+    }
+    // TODO
+    str.prepend(sp);
+    return str;
+}
+
+void Cell::collectCells(QVector<Cell *> &itercells, bool recurse)
+{
+    itercells.append(this);
+    if (grid && recurse) grid->collectCells(itercells);
+}
+
+Cell *Cell::findNextSearchMatch(const QString &search, Cell *best, Cell *selected, bool &lastwasselected)
+{
+    if (text.t.toLower().indexOf(search) >= 0)
+    {
+        if (lastwasselected) best = this;
+        lastwasselected = false;
+    }
+    if (selected == this) lastwasselected = true;
+    if (grid) best = grid->findNextSearchMatch(search, best, selected, lastwasselected);
+    return best;
+}
+
+void Cell::findReplaceAll(const QString &str)
+{
+    if (grid) grid->findReplaceAll(str);
+    text.replaceStr(str);
+}
+
+Grid *Cell::addGrid(int x, int y)
+{
+    if (!grid)
+    {
+        grid = new Grid(x, y, this);
+        grid->initCells(this);
+        if (p) grid->cloneStyleFrom(p->grid);
+    }
+    return grid;
+}
+
+void Cell::setBorder(int width)
+{
+    if (grid) grid->user_grid_outer_spacing = width;
+}
+
+void Cell::setGridTextLayout(int ds, bool vert, bool noset)
+{
+    if (!noset) verticaltextandgrid = vert;
+    if (ds != -1) drawstyle = ds;
+    if (grid) grid->setGridTextLayout(ds, vert, noset, grid->selectAll());
+}
+
+Cell *Cell::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward)
+{
+    if (grid) best = grid->findLink(s, link, best, lastthis, stylematch, forward);
+    if (link == this)
+    {
+        lastthis = true;
+        return best;
+    }
+    if (link->text.toText(0, s, A_EXPTEXT) == text.t)
+    {
+        if (link->text.stylebits != text.stylebits || link->cellcolor != cellcolor ||
+                link->textcolor != textcolor)
+        {
+            if (!stylematch) best = nullptr;
+            stylematch = true;
+        }
+        else if (stylematch)
+        {
+            return best;
+        }
+        if (!best || lastthis)
+        {
+            lastthis = false;
+            return this;
+        }
+    }
+    return best;
 }
 
 int Cell::getX(Document *doc) const

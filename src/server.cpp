@@ -1,5 +1,7 @@
 #include "server.h"
 #include "symdef.h"
+#include "myapp.h"
+#include "mainwindow.h"
 
 #include <QDebug>
 
@@ -32,8 +34,10 @@ void Server::readMsg()
 
 void Server::procMsg(const QString &msg)
 {
-    // todo
-    Q_UNUSED(msg)
-    qDebug() << msg;
+    myApp.frame->deIconize();
+    if (msg.length() && msg != "*")
+    {
+        myApp.open(msg);
+    }
 }
 

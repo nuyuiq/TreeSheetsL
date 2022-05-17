@@ -52,6 +52,15 @@ void Text::load(Tools::DataIO &dis, QVariantMap &info)
     lastedit = QDateTime::fromMSecsSinceEpoch(time);
 }
 
+void Text::save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const
+{
+    dos.writeString(t);
+    dos.writeInt32(relsize);
+    dos.writeInt32(image.data()? imgs.indexOf(image): -1);
+    dos.writeInt32(stylebits);
+    dos.writeInt64(lastedit.toMSecsSinceEpoch());
+}
+
 bool Text::isInSearch() const
 {
     return myApp.frame->searchstring.length() &&
@@ -410,6 +419,89 @@ void Text::drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, boo
             }
 
             if (!len) break;
+        }
+    }
+}
+
+static QString htmlify(const QString &str) {
+    QString r;
+    for (int i = 0; i < str.length(); i++)
+    {
+        switch (str[i].unicode())
+        {
+        case '&': r += QStringLiteral("&amp;"); break;
+        case '<': r += QStringLiteral("&lt;"); break;
+        case '>': r += QStringLiteral("&gt;"); break;
+        default:  r += str[i];
+        }
+    }
+    return r;
+}
+
+QString Text::toText(int indent, const Selection &s, int format)
+{
+    Q_UNUSED(indent)
+    QString str = s.cursor != s.cursorend ? t.mid(s.cursor, s.cursorend - s.cursor) : t;
+    if (format == A_EXPXML || format == A_EXPHTMLT || format == A_EXPHTMLO || format == A_EXPHTMLB)
+        str = htmlify(str);
+    return str;
+}
+
+void Text::replaceStr(const QString &str)
+{
+    for (int i = 0, j; (j = t.mid(i).toLower().indexOf(myApp.frame->searchstring)) >= 0;)
+    {
+        // does this need WasEdited()?
+        i += j;
+        t.replace(i, myApp.frame->searchstring.length(), str);
+        i += str.length();
+    }
+}
+
+void Text::backspace(Selection &s)
+{
+    if (!rangeSelRemove(s))
+    {
+        if (s.cursor > 0)
+        {
+            t.remove(--s.cursor, 1);
+            --s.cursorend;
+        }
+    }
+}
+
+void Text::Delete(Selection &s)
+{
+    if (!rangeSelRemove(s))
+    {
+        if (s.cursor < t.length())
+        {
+            t.remove(s.cursor, 1);
+        }
+    }
+}
+
+void Text::selectWordBefore(Selection &s)
+{
+    if (s.cursor <= 1) return;
+    s.cursorend = s.cursor--;
+    expandToWord(s);
+}
+
+void Text::homeEnd(Selection &s, bool home)
+{
+    int i = 0;
+    int cw = cell->colWidth();
+    int findwhere = home ? s.cursor : s.cursorend;
+    for (;;) {
+        int start = i;
+        QString curl = getLine(i, cw);
+        if (curl.isEmpty()) break;
+        int end = i == t.length() ? i : i - 1;
+        if (findwhere >= start && findwhere <= end)
+        {
+            s.cursor = s.cursorend = home ? start : end;
+            break;
         }
     }
 }

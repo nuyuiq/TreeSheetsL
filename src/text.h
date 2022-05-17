@@ -35,7 +35,7 @@ public:
 
     //! 从序列化中加载数据
     void load(Tools::DataIO &dis, QVariantMap &info);
-
+    void save(Tools::DataIO &dos, const QVector<ImagePtr> &imgs) const;
     bool isInSearch() const;
     void selectWord(Selection &s) const;
     void expandToWord(Selection &s) const;
@@ -53,7 +53,25 @@ public:
     bool rangeSelRemove(Selection &s);
     void setRelSize(Selection &s);
     void drawCursor(Document *doc, QPainter &dc, Selection &s, uint color, bool cursoronly, int maxcolwidth);
+    QString toText(int indent, const Selection &s, int format);
+    void replaceStr(const QString &str);
+    void backspace(Selection &s);
+    void Delete(Selection &s);
+    void selectWordBefore(Selection &s);
+    void homeEnd(Selection &s, bool home);
 
+
+
+    inline void backspaceWord(Selection &s)
+    {
+        selectWordBefore(s);
+        backspace(s);
+    }
+    inline void deleteWord(Selection &s)
+    {
+        selectWord(s);
+        Delete(s);
+    }
     inline int minRelsize(int rs) const { return qMin(relsize, rs); }
     //! 更新修改时间为当前
     inline void wasEdited() { lastedit = QDateTime::currentDateTime(); }

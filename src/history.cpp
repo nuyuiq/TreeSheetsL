@@ -38,6 +38,13 @@ void FileHistory::addFileToHistory(const QString &filename)
     dirty0 = true;
 }
 
+QString FileHistory::getHistoryFile(int idx)
+{
+    Q_ASSERT(idx >= 0);
+    if (idx >= historyfile.size()) return QString();
+    return historyfile.at(idx);
+}
+
 void FileHistory::rememberOpenFiles()
 {
     int n = myApp.frame->nb->count();

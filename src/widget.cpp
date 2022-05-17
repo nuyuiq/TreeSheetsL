@@ -172,8 +172,7 @@ void Widget::mouseMoveEvent(QMouseEvent *e)
     updateHover(e->x(), e->y(), dc);
     if (e->buttons() & (Qt::LeftButton | Qt::RightButton))
     {
-        // TODO
-        // doc->Drag(dc);
+        doc->drag(dc);
     }
     else if (e->buttons() & Qt::MiddleButton)
     {

@@ -13,7 +13,7 @@ public:
 
     void setMenu(QMenu*menu);
     void addFileToHistory(const QString &filename);
-
+    QString getHistoryFile(int idx);
 
     void rememberOpenFiles();
     inline QStringList getOpenFiles() { return lastopenfile; }

@@ -42,6 +42,16 @@ struct MyApp
     //! 记录文件使用
     void fileUsed(const QString &filename, Document *doc);
 
+    //! 打开文件
+    QString open(const QString &fn);
+
+    //! 导入
+    QString import(int k);
+
+    //! 加载例程
+    static void loadTut();
+    static void loadOpRef();
+
     //! 加载翻译文件
     void loadTranslation(const QString &filename);
     // 定义 MyApp 内翻译助手

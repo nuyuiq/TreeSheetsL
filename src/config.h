@@ -20,6 +20,7 @@ enum {
     A_NEWGRID,
     A_UNDO,
     A_ABOUT,
+    A_ABOUTQT,
     A_RUN,
     A_CLRVIEW,
     A_MARKDATA,
@@ -58,8 +59,8 @@ enum {
     A_ADOWN,
     A_SCLEFT,
     A_SCRIGHT,
-//    A_SCUP,
-//    A_SCDOWN,
+    A_SCUP,
+    A_SCDOWN,
     A_DEFFONT,
     A_IMPXML,
     A_IMPXMLA,
@@ -211,7 +212,7 @@ enum {
 
     A_TAGSET = 1000,  // and all values from here on
     A_SCRIPT = 2000,  // and all values from here on
-//    A_MAXACTION = 3000
+    A_MAXACTION = 3000
 };
 
 struct CfgCache {
@@ -225,6 +226,9 @@ struct CfgCache {
     uint pen_tinygridlines;
     uint pen_gridlines;
     uint pen_thinselect;
+    uint lastcellcolor;
+    uint lasttextcolor;
+    uint lastbordcolor;
     bool singletray;
     bool minclose;
     bool totray;
