@@ -542,6 +542,11 @@ Cell *Cell::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool 
     return best;
 }
 
+Cell *Cell::findExact(const QString &s)
+{
+    return text.t == s ? this : (grid ? grid->findExact(s) : nullptr);
+}
+
 int Cell::getX(Document *doc) const
 {
     return ox + (p ? p->getX(doc) : doc->hierarchysize);

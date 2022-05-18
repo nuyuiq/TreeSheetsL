@@ -1,4 +1,4 @@
-QT       += core gui network
+QT       += core gui network xml
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -23,7 +23,8 @@ SOURCES += \
     cell.cpp \
     grid.cpp \
     text.cpp \
-    selection.cpp
+    selection.cpp \
+    action.cpp
 
 HEADERS += \
     history.h \

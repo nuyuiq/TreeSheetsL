@@ -7,6 +7,8 @@
 #include <QPainter>
 #include <QDebug>
 #include <QWidget>
+#include <QInputDialog>
+#include <QFileDialog>
 
 
 #define FloatToUnsigned(f)  ((quint32)(((qint32)((f) - 2147483648.0)) + 2147483647L) + 1)
@@ -274,7 +276,7 @@ Tools::Painter::~Painter()
     delete dp;
     if (needUpdate == 1)
     {
-        widget->update(rect);
+        widget->update(rect.adjusted(-2, -2, 2, 2));
     }
     else if (needUpdate == 2)
     {
@@ -319,7 +321,7 @@ void Tools::drawRoundedRect(QPainter &dc, int roundness, const QRect &rect)
     }
     else
     {
-    dc.drawRoundedRect(rect, roundness, roundness, Qt::AbsoluteSize);
+        dc.drawRoundedRect(rect, roundness, roundness, Qt::AbsoluteSize);
     }
 }
 
@@ -346,4 +348,45 @@ void Tools::drawText(QPainter &dc, const QString &s, int x, int y, int w, int h)
     {
         dc.drawText(rect, s);
     }
+}
+
+
+int Tools::countCol(const QString &s)
+{
+    int col = 0;
+    const int size = s.size();
+    while (col < size && (s[col] == ' ' || s[col] == '\t')) col++;
+    return col;
+}
+
+
+int Dialog::intValue(const QString &title, const QString &label, int min, int max, int def, int errret)
+{
+    bool ok;
+    int retval = QInputDialog::getInt(nullptr, title, label, def, min, max, 1, &ok);
+    return ok? retval: errret;
+}
+
+
+QString Dialog::openFile(const QString &title, const QString &filter, const QString &def)
+{
+    QString selectedFilter = def;
+    return QFileDialog::getOpenFileName(
+                nullptr,
+                title,
+                QString(),
+                filter,
+                &selectedFilter);
+}
+
+
+QString Dialog::saveFile(const QString &title, const QString &filter, const QString &def)
+{
+    QString selectedFilter = def;
+    return QFileDialog::getSaveFileName(
+                nullptr,
+                title,
+                QString(),
+                filter,
+                &selectedFilter);
 }

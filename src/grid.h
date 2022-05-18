@@ -79,6 +79,7 @@ struct Grid
     void setStyle(Document *doc, Selection &s, int sb);
     void setStyles(Selection &s, Cell *o);
     void clearImages(Selection &s);
+    //! 不可重入
     void sort(Selection &s, bool descending);
     void replaceStr(Document *doc, const QString &str, Selection &s);
     void setBorder(int width, Selection &s);
@@ -90,7 +91,14 @@ struct Grid
     void reParent(Cell *p);
     int flatten(int curdepth, int cury, Grid *g);
     Selection hierarchySwap(const QString &tag);
+    void CSVImport(const QStringList &as, char sep);
     Cell *findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward);
+    Cell *findExact(const QString &s);
+    Cell *deleteTagParent(Cell *tag, Cell *basecell, Cell *found);
+    void mergeTagCell(Cell *f, Cell *&selcell);
+    void mergeTagAll(Cell *into);
+    void add(Cell *c);
+
 
 
 
@@ -104,6 +112,7 @@ struct Grid
         bordercolor = o->bordercolor;
         // TODO: what others?
     }
+    static int fillRows(Grid *g, const QStringList &as, int column, int startrow, int starty);
 };
 
 #endif // GRID_H

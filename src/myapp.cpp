@@ -20,6 +20,9 @@
 #include <QDateTime>
 #include <QBuffer>
 #include <QFileInfo>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QtEndian>
 
 // 全局变量
 MyApp myApp;
@@ -55,7 +58,8 @@ static void docInit(const QString &filename)
         const auto &fs = myApp.fhistory->getOpenFiles();
         foreach (const QString &fn, fs)
         {
-            myApp.loadDB(fn, false);
+            const auto &rs = myApp.loadDB(fn, false);
+            if (!rs.isEmpty()) qDebug() << fn << rs;
         }
     }
 
@@ -132,6 +136,14 @@ void MyApp::relese()
     DELPTR(cfg);
     DELPTR(log);
     DELPTR(server);
+}
+
+static QByteArray uncompressNodeData(const QByteArray &data)
+{
+    if (data.isEmpty()) return QByteArray();
+    QByteArray tmp = QByteArray(4, Qt::Uninitialized) + data;
+    qToBigEndian<qint32>(data.size() * 4, tmp.data());
+    return qUncompress(tmp);
 }
 
 // 加载本地文件
@@ -227,9 +239,7 @@ QString MyApp::loadDB(const QString &filename, bool fromreload)
             }
             else if (*buf == 'D')
             {
-                auto databuff = fis.readAll();
-                int len = databuff.size();
-                databuff = qUncompress(QByteArray((char*)&len, 4) + databuff);
+                QByteArray databuff = uncompressNodeData(fis.readAll());
                 if (!databuff.size()) return tr("Cannot decompress file.");
                 QBuffer dbuff(&databuff);
                 dbuff.open(QIODevice::ReadOnly);
@@ -344,57 +354,118 @@ QString MyApp::open(const QString &fn)
     return tr("Open file cancelled.");
 }
 
-QString MyApp::import(int k)
+static void fillXML(Cell *c, const QDomElement &n, bool attributestoo)
 {
     // TODO
-//    wxString fn = ::wxFileSelector(_(L"Please select file to import:"), L"", L"", L"", L"*.*",
-//                                   wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_CHANGE_DIR);
-//    if (!fn.empty()) {
-//        wxBusyCursor wait;
-//        switch (k) {
-//        case A_IMPXML:
-//        case A_IMPXMLA: {
-//            wxXmlDocument doc;
-//            if (!doc.Load(fn)) goto problem;
-//            Cell *&r = InitDB(1);
-//            Cell *c = *r->grid->cells;
-//            FillXML(c, doc.GetRoot(), k == A_IMPXMLA);
-//            if (!c->HasText() && c->grid) {
-//                *r->grid->cells = nullptr;
-//                delete r;
-//                r = c;
-//                c->parent = nullptr;
-//            }
-//            break;
-//        }
-//        case A_IMPTXTI:
-//        case A_IMPTXTC:
-//        case A_IMPTXTS:
-//        case A_IMPTXTT: {
-//            wxFFile f(fn);
-//            if (!f.IsOpened()) goto problem;
-//            wxString s;
-//            if (!f.ReadAll(&s)) goto problem;
-//            const wxArrayString &as = wxStringTokenize(s, LINE_SEPERATOR);
-
-//            if (as.size()) switch (k) {
-//            case A_IMPTXTI: {
-//                Cell *r = InitDB(1);
-//                FillRows(r->grid, as, CountCol(as[0]), 0, 0);
-//            }; break;
-//            case A_IMPTXTC: InitDB(1, (int)as.size())->grid->CSVImport(as, L','); break;
-//            case A_IMPTXTS: InitDB(1, (int)as.size())->grid->CSVImport(as, L';'); break;
-//            case A_IMPTXTT: InitDB(1, (int)as.size())->grid->CSVImport(as, L'\t'); break;
-//            }
-//            break;
-//        }
-//        }
-//        frame->GetCurTab()->doc->ChangeFileName(fn.Find(L'.') >= 0 ? fn.BeforeLast(L'.') : fn, true);
-//        frame->GetCurTab()->doc->ClearSelectionRefresh();
+    qDebug() << "TODO";
+//    const wxArrayString &as = wxStringTokenize(
+//        n->GetType() == wxXML_ELEMENT_NODE ? n->GetNodeContent() : n->GetContent());
+//    loop(i, as.GetCount()) {
+//        if (c->text.t.Len()) c->text.t.Append(L' ');
+//        c->text.t.Append(as[i]);
 //    }
-//    return nullptr;
-//problem:
-//    wxMessageBox(_(L"couldn't import file!"), fn, wxOK, frame);
+
+//    if (n->GetName() == L"cell") {
+//        c->text.relsize = -wxAtoi(n->GetAttribute(L"relsize", L"0"));
+//        c->text.stylebits = wxAtoi(n->GetAttribute(L"stylebits", L"0"));
+//        c->cellcolor = wxAtoi(n->GetAttribute(L"colorbg", L"16777215"));
+//        c->textcolor = wxAtoi(n->GetAttribute(L"colorfg", L"0"));
+//        c->celltype = wxAtoi(n->GetAttribute(L"type", L"0"));
+//    }
+
+//    Vector<wxXmlNode *> ns;
+//    Vector<wxXmlAttribute *> ps;
+//    int numrows = GetXMLNodes(n, ns, &ps, attributestoo);
+//    if (!numrows) return;
+
+//    if (ns.size() == 1 && (!c->text.t.Len() || ns[0]->IsWhitespaceOnly()) &&
+//        ns[0]->GetName() != L"row") {
+//        FillXML(c, ns[0], attributestoo);
+//    } else {
+//        bool allrow = n->GetName() == L"grid";
+//        loopv(i, ns) if (ns[i]->GetName() != L"row") allrow = false;
+//        if (allrow) {
+//            int desiredxs;
+//            loopv(i, ns) {
+//                Vector<wxXmlNode *> ins;
+//                int xs = GetXMLNodes(ns[i], ins);
+//                if (!i) {
+//                    desiredxs = xs ? xs : 1;
+//                    c->AddGrid(desiredxs, ns.size());
+//                }
+//                loop(j, desiredxs) if (ins.size() > j)
+//                    FillXML(c->grid->C(j, i), ins[j], attributestoo);
+//                ins.setsize_nd(0);
+//            }
+//        } else {
+//            c->AddGrid(1, numrows);
+//            loopv(i, ps) c->grid->C(0, i)->text.t = ps[i]->GetValue();
+//            loopv(i, ns) FillXML(c->grid->C(0, i + ps.size()), ns[i], attributestoo);
+//        }
+//    }
+
+//    ns.setsize_nd(0);
+//    ps.setsize_nd(0);
+}
+
+QString MyApp::import(int k)
+{
+    const QString fn = Dialog::openFile(
+                tr("Please select file to import:"),
+                "*.* (*.*)");
+    if (!fn.isEmpty())
+    {
+        switch (k) {
+        case A_IMPXML:
+        case A_IMPXMLA: {
+            QDomDocument doc;
+            QFile file(fn);
+            if (file.open(QIODevice::ReadOnly)) goto problem;
+            if (!doc.setContent(&file)) goto problem;
+            Cell *r = initDB(1);
+            Cell *c = *r->grid->cells;
+            fillXML(c, doc.documentElement(), k == A_IMPXMLA);
+            if (!c->hasText() && c->grid)
+            {
+                *r->grid->cells = nullptr;
+                delete r;
+                r = c;
+                c->p = nullptr;
+            }
+            break;
+        }
+        case A_IMPTXTI:
+        case A_IMPTXTC:
+        case A_IMPTXTS:
+        case A_IMPTXTT: {
+            QFile f(fn);
+            if (!f.open(QIODevice::ReadOnly)) goto problem;
+            const QString &s =  QString::fromUtf8(f.readAll());
+            if (!s.isEmpty()) goto problem;
+            const QStringList &as = s.split(LINE_SEPERATOR);
+            if (as.size())
+            {
+                switch (k)
+                {
+                case A_IMPTXTI: {
+                    Cell *r = initDB(1);
+                    Grid::fillRows(r->grid, as, Tools::countCol(as[0]), 0, 0);
+                    break;
+                }
+                case A_IMPTXTC: initDB(1, as.size())->grid->CSVImport(as, ','); break;
+                case A_IMPTXTS: initDB(1, as.size())->grid->CSVImport(as, ';'); break;
+                case A_IMPTXTT: initDB(1, as.size())->grid->CSVImport(as, '\t'); break;
+                }
+            }
+            break;
+        }
+        }
+        frame->getCurTab()->doc->changeFileName(fn.indexOf('.') >= 0 ? fn.section('.', 0, -2) : fn, true);
+        frame->getCurTab()->doc->clearSelectionRefresh();
+    }
+    return QString();
+problem:
+    QMessageBox::warning(frame, fn, tr("couldn't import file!"));
     return tr("File load error.");
 }
 

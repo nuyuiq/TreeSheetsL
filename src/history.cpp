@@ -29,6 +29,7 @@ void FileHistory::setMenu(QMenu *menu)
 void FileHistory::addFileToHistory(const QString &filename)
 {
     if (historyfile.size() && historyfile.at(0) == filename) return;
+
     historyfile.removeOne(filename);
     historyfile.prepend(filename);
     while (historyfile.size() > MAXCOUNT_HISTORY)

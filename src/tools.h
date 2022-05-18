@@ -19,6 +19,8 @@ QString bakName(const QString &filename);
 QString tmpName(const QString &filename);
 QString extName(const QString &filename, const QString &ext);
 
+int countCol(const QString &s);
+
 void drawRect(QPainter &dc, int x, int y, int xs, int ys);
 void drawRect(QPainter &dc, uint color, int x, int y, int xs, int ys, bool outline = false);
 void drawRoundedRect(QPainter &dc, uint color, int roundness, int x, int y, int xs, int ys);
@@ -112,5 +114,16 @@ public:
 };
 
 #define DELPTR(p) ({if (p) {delete p; p = nullptr;}})
+
+
+
+
+namespace Dialog {
+QString saveFile(const QString &title, const QString &filter, const QString &def=QString());
+QString openFile(const QString &title, const QString & filter, const QString &def=QString());
+int intValue(const QString &title, const QString &label, int min, int max, int def, int errret=-1);
+
+}
+
 
 #endif // TOOLS_H

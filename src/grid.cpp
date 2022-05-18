@@ -514,7 +514,6 @@ void Grid::drawInsert(Document *doc, QPainter &dc, Selection &s, uint colour)
             lines[line].setCoords(x + line, y1, x + line, y2);
         }
         bline.setRect(x - 1, c->getY(doc), _g::line_width + 2, c->sy);
-
     }
     else
     {
@@ -907,23 +906,35 @@ void Grid::clearImages(Selection &s)
     foreachcellinsel(c, s) c->text.image.clear();
 }
 
+static struct CellRowCmpArg {
+    int sortcolumn;
+    int sortxs;
+    int sortdescending;
+}*_cmparg;
+typedef int (__cdecl *FuncCompare)(const void *,const void *);
+static int __cdecl cellRowCmp(const Cell **a, const Cell **b)
+{
+    int sortcolumn     = _cmparg->sortcolumn;
+    int sortxs         = _cmparg->sortxs;
+    int sortdescending = _cmparg->sortdescending;
+    for (int i = 0; i < sortxs; i++)
+    {
+        int off = (i + sortcolumn) % sortxs;
+        int cmp = (*(a + off))->text.t.compare((*(b + off))->text.t, Qt::CaseInsensitive);
+        if (cmp) return sortdescending ? -cmp : cmp;
+    }
+    return 0;
+}
+
+//! 不可重入
 void Grid::sort(Selection &s, bool descending)
 {
-    // TODO
-//    int sortcolumn = s.x;
-//    int sortxs = xs;
-//    int sortdescending = descending;
-//    auto sortfunc = [&](const Cell **a, const Cell **b) {
-//        for (int i = 0; i < sortxs; i++)
-//        {
-//            int off = (i + sortcolumn) % sortxs;
-//            int cmp = (*(a + off))->text.t.CmpNoCase((*(b + off))->text.t);
-//            if (cmp) return sortdescending ? -cmp : cmp;
-//        }
-//        return 0;
-//    };
-
-//    qsort(cells + s.y * xs, s.ys, sizeof(Cell *) * xs, sortfunc);
+    CellRowCmpArg cmparg;
+    cmparg.sortcolumn = s.x;
+    cmparg.sortxs = xs;
+    cmparg.sortdescending = descending;
+    _cmparg = &cmparg;
+    qsort(cells + s.y * xs, s.ys, sizeof(Cell *) * xs, FuncCompare(cellRowCmp));
 }
 
 void Grid::replaceStr(Document *doc, const QString &str, Selection &s)
@@ -1043,43 +1054,109 @@ int Grid::flatten(int curdepth, int cury, Grid *g)
 
 Selection Grid::hierarchySwap(const QString &tag)
 {
-    return Selection();
-//    Cell *selcell = nullptr;
-//    bool done = false;
-//lookformore:
-//    foreachcell(c) if (c->grid && !done) {
-//        Cell *f = c->grid->findExact(tag);
-//        if (f) {
-//            // add all parent tags as extra hierarchy inside the cell
-//            for (Cell *p = f->parent; p != cell; p = p->parent) {
-//                // Special case check: if parents have same name, this would cause infinite
-//                // swapping.
-//                if (p->text.t == tag) done = true;
-//                Cell *t = new Cell(f, p);
-//                t->text = p->text;
-//                t->text.cell = t;
-//                t->grid = f->grid;
-//                if (t->grid) t->grid->ReParent(t);
-//                f->grid = new Grid(1, 1);
-//                f->grid->cell = f;
-//                *f->grid->cells = t;
+    Cell *selcell = nullptr;
+    bool done = false;
+lookformore:
+    foreachcell(c) if (c->grid && !done) {
+        Cell *f = c->grid->findExact(tag);
+        if (f)
+        {
+            // add all parent tags as extra hierarchy inside the cell
+            for (Cell *p = f->p; p != cell; p = p->p)
+            {
+                // Special case check: if parents have same name, this would cause infinite
+                // swapping.
+                if (p->text.t == tag) done = true;
+                Cell *t = new Cell(f, p);
+                t->text = p->text;
+                t->text.cell = t;
+                t->grid = f->grid;
+                if (t->grid) t->grid->reParent(t);
+                f->grid = new Grid(1, 1);
+                f->grid->cell = f;
+                *f->grid->cells = t;
+            }
+            // remove cell from parent, recursively if parent becomes empty
+            for (Cell *r = f; r && r != cell; r = r->p->grid->deleteTagParent(r, cell, f))
+                ;
+            // merge newly constructed hierarchy at this level
+            if (!*cells)
+            {
+                *cells = f;
+                f->p = cell;
+                selcell = f;
+            } else {
+                mergeTagCell(f, selcell);
+            }
+            goto lookformore;
+        }
+    }
+    Q_ASSERT(selcell);
+    return findCell(selcell);
+}
+
+void Grid::CSVImport(const QStringList &as, char sep)
+{
+    // TODO
+    qDebug() << "TODO";
+//    int cy = 0;
+//    for (int y = 0; y < as.size(); y++)
+//    {
+//        QString s = as[y];
+//        QString word;
+//        for (int x = 0; s.at(0); x++)
+//        {
+//            if (s[0] == '\"') {
+//                word.clear();
+//                for (int i = 1;; i++)
+//                {
+//                    if (!s[i])
+//                    {
+//                        if (y < as.size() - 1)
+//                        {
+//                            s = as[++y];
+//                            i = 0;
+//                        }
+//                        else
+//                        {
+//                            s.clear();
+//                            break;
+//                        }
+//                    }
+//                    else if (s[i] == '\"')
+//                    {
+//                        if (s[i + 1] == '\"')
+//                            word += s[++i];
+//                        else
+//                        {
+//                            s = s.size() == i + 1 ? QString() : s.mid(i + 2);
+//                            break;
+//                        }
+//                    }
+//                    else word += s[i];
+//                }
 //            }
-//            // remove cell from parent, recursively if parent becomes empty
-//            for (Cell *r = f; r && r != cell; r = r->parent->grid->DeleteTagParent(r, cell, f))
-//                ;
-//            // merge newly constructed hierarchy at this level
-//            if (!*cells) {
-//                *cells = f;
-//                f->parent = cell;
-//                selcell = f;
-//            } else {
-//                MergeTagCell(f, selcell);
+//            else
+//            {
+//                int pos = s.indexOf(sep);
+//                if (pos < 0)
+//                {
+//                    word = s;
+//                    s.clear();
+//                }
+//                else
+//                {
+//                    word = s.left(pos);
+//                    s = s.mid(pos + 1);
+//                }
 //            }
-//            goto lookformore;
+//            if (x >= xs) insertCells(x, -1, 1, 0);
+//            Cell *c = C(x, cy);
+//            c->text.t = word;
 //        }
+//        cy++;
 //    }
-//    Q_ASSERT(selcell);
-//    return findCell(selcell);
+//    ys = cy;  // throws memory away, but doesn't matter
 }
 
 Cell *Grid::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward)
@@ -1093,4 +1170,110 @@ Cell *Grid::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool 
         foreachcellrev(c) best = c->findLink(s, link, best, lastthis, stylematch, forward);
     }
     return best;
+}
+
+Cell *Grid::findExact(const QString &s)
+{
+    foreachcell(c)
+    {
+        Cell *f = c->findExact(s);
+        if (f) return f;
+    }
+    return nullptr;
+}
+
+Cell *Grid::deleteTagParent(Cell *tag, Cell *basecell, Cell *found)
+{
+    replaceCell(tag, nullptr);
+    if (xs * ys == 1)
+    {
+        if (cell != basecell)
+        {
+            cell->grid = nullptr;
+            delete this;
+        }
+        Cell *next = tag->p;
+        if (tag != found) delete tag;
+        return next;
+    }
+    else
+    {
+        foreachcell(c) if (c == nullptr)
+        {
+            if (ys > 1)
+                deleteCells(-1, y, 0, -1);
+            else
+                deleteCells(x, -1, -1, 0);
+            return nullptr;
+        }
+    }
+    Q_ASSERT(false);
+    return nullptr;
+}
+
+void Grid::mergeTagCell(Cell *f, Cell *&selcell)
+{
+    foreachcell(c) if (c->text.t == f->text.t)
+    {
+        if (!selcell) selcell = c;
+
+        if (f->grid)
+        {
+            if (c->grid)
+            {
+                f->grid->mergeTagAll(c);
+            } else {
+                c->grid = f->grid;
+                c->grid->reParent(c);
+                f->grid = nullptr;
+            }
+            delete f;
+        }
+        return;
+    }
+    if (!selcell) selcell = f;
+    add(f);
+}
+
+void Grid::mergeTagAll(Cell *into)
+{
+    foreachcell(c)
+    {
+        into->grid->mergeTagCell(c, into /*dummy*/);
+        c = nullptr;
+    }
+}
+
+void Grid::add(Cell *c)
+{
+    if (horiz) insertCells(xs, -1, 1, 0, c);
+    else insertCells(-1, ys, 0, 1, c);
+    c->p = cell;
+}
+
+int Grid::fillRows(Grid *g, const QStringList &as, int column, int startrow, int starty)
+{
+    int y = starty;
+    for (int i = startrow; i < as.size(); i++)
+    {
+        const QString &s = as[i];
+        int col = Tools::countCol(s);
+        if (col < column && startrow != 0) return i;
+        if (col > column)
+        {
+            Cell *c = g->C(0, y - 1);
+            Grid *sg = c->grid;
+            i = fillRows(sg ? sg : c->addGrid(), as, col, i, sg ? sg->ys : 0) - 1;
+        }
+        else
+        {
+            if (g->ys <= y) g->insertCells(-1, y, 0, 1);
+            Text &t = g->C(0, y)->text;
+            // == s.leftTrim
+            t.t = (s+"a").trimmed();
+            t.t.resize(t.t.size() - 1);
+            y++;
+        }
+    }
+    return as.size();
 }

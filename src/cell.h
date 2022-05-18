@@ -98,7 +98,7 @@ struct Cell
     void setGridTextLayout(int ds, bool vert, bool noset);
     Cell *findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch,
                     bool forward);
-
+    Cell *findExact(const QString &s);
 
 
     inline bool hasText() const { return !text.t.isEmpty(); }

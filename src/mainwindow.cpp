@@ -50,8 +50,9 @@ Widget *MainWindow::createWidget(bool append)
     Q_ASSERT(scroll);
     Widget* widget = new Widget(scroll);
     Q_ASSERT(widget);
-    nb->insertTab(append? -1: 0, scroll, QString());
+    int idx = nb->insertTab(append? -1: 0, scroll, QString());
     widget->resize(scroll->size());
+    nb->setCurrentIndex(idx);
     return widget;
 }
 
@@ -62,115 +63,6 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
                             QSystemTrayIcon::Trigger:
                             QSystemTrayIcon::DoubleClick);
     if (b) deIconize();
-}
-
-void MainWindow::actionActivated()
-{
-    Widget *sw = getCurTab();
-    QAction *action = qobject_cast<QAction*>(sender());
-    auto Check = [&](const char *cfg, bool *var = nullptr)
-    {
-        if (action)
-        {
-            bool b;
-            if (!var) var = &b;
-            *var = action->isChecked();
-            myApp.cfg->write(QString::fromLatin1(cfg), *var);
-            sw->status(tr("change will take effect next run of TreeSheets"));
-        }
-    };
-    int kid = sender()->property("kid").toInt();
-    switch (kid)
-    {
-    case A_NOP: break;
-    case A_ALEFT: sw->cursorScroll(-_g::scrollratecursor, 0); break;
-    case A_ARIGHT: sw->cursorScroll(_g::scrollratecursor, 0); break;
-    case A_AUP: sw->cursorScroll(0, -_g::scrollratecursor); break;
-    case A_ADOWN: sw->cursorScroll(0, _g::scrollratecursor); break;
-
-    case A_ICONSET:   Check("iconset"); break;
-    case A_SHOWSBAR:  Check("showsbar"); break;
-    case A_SHOWTBAR:  Check("showtbar"); break;
-    case A_LEFTTABS:  Check("lefttabs"); break;
-    case A_SINGLETRAY:Check("singletray"); break;
-    case A_MAKEBAKS:  Check("makebaks", &myApp.cfg->makebaks); break;
-    case A_TOTRAY:    Check("totray", &myApp.cfg->totray); break;
-    case A_MINCLOSE:  Check("minclose", &myApp.cfg->minclose); break;
-    case A_ZOOMSCR:   Check("zoomscroll", &myApp.cfg->zoomscroll); break;
-    case A_THINSELC:  Check("thinselc", &myApp.cfg->thinselc); break;
-    case A_AUTOSAVE:  Check("autosave", &myApp.cfg->autosave); break;
-    case A_CENTERED:  Check("centered", &myApp.cfg->centered); update(); break;
-    case A_FSWATCH:   Check("fswatch", &myApp.cfg->fswatch); break;
-    case A_AUTOEXPORT:Check("autohtmlexport", &myApp.cfg->autohtmlexport); break;
-    case A_FASTRENDER:Check("fastrender", &myApp.cfg->fastrender); update(); break;
-    case A_FULLSCREEN:
-        if (isFullScreen()) showNormal();
-        else
-        {
-            showFullScreen();
-            sw->status(tr("Press F11 to exit fullscreen mode."));
-        }
-        break;
-    case A_ZEN_MODE:
-        if (!isFullScreen())
-        {
-            if (tb != nullptr) tb->setVisible(zenmode);
-            if (sb != nullptr) sb->setVisible(zenmode);
-            this->resize(size()); // TODO
-            this->update();
-            if (tb != nullptr) tb->update();
-            if (sb != nullptr) sb->update();
-            zenmode = !zenmode;
-        }
-        break;
-    case A_SEARCHF:
-        if (filter)
-        {
-            filter->setFocus();
-            filter->selectAll();
-        }
-        else
-        {
-            sw->status(tr("Please enable (Options -> Show Toolbar) to use search."));
-        }
-        break;
-    case A_EXIT:
-        fromclosebox = false;
-        myApp.frame->close();
-        break;
-    case A_CLOSE:
-    {
-        Tools::Painter dc(sw);
-        sw->doc->shiftToCenter(dc);
-        sw->doc->action(dc, kid); break;  // sw dangling pointer on return
-    }
-    default:
-        if (kid >= A_FILEHIS0 && kid <= A_FILEHIS0 + 8)
-        {
-            const QString &fn = myApp.fhistory->getHistoryFile(kid - A_FILEHIS0);
-            sw->status(myApp.open(fn));
-        }
-        else if (kid >= A_TAGSET && kid < A_SCRIPT)
-        {
-            sw->status(sw->doc->tagSet(kid - A_TAGSET));
-        }
-        else if (kid >= A_SCRIPT && kid < A_MAXACTION)
-        {
-            const QString &sf = myApp.cfg->scriptsInMenu.at(kid - A_SCRIPT);
-            // TODO
-            qDebug() << "script run :" << sf;
-            sw->status(QString("scrip run(todo)"));
-//            auto msg = tssi.ScriptRun(sf);
-//            msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
-//            sw->status(wxString(msg));
-        }
-        else
-        {
-            Tools::Painter dc(sw);
-            sw->doc->shiftToCenter(dc);
-            sw->status(sw->doc->action(dc, kid));
-        }
-    }
 }
 
 void MainWindow::fileChanged(const QString &path)
@@ -1008,7 +900,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
         }
     }
 
-    myApp.fhistory->rememberOpenFiles();
     if (!isHidden())
     {
         bool isM = isMaximized();

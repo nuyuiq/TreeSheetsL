@@ -37,5 +37,18 @@
 // 滚轮的步长增量
 #define WHEELDELTA 120
 
+
+#ifdef Q_OS_WIN
+#define PATH_SEPERATOR "\\"
+#define LINE_SEPERATOR "\r\n"
+#else
+#define PATH_SEPERATOR "/"
+#ifdef Q_OS_MAC
+#define LINE_SEPERATOR "\r"
+#else
+#define LINE_SEPERATOR "\n"
+#endif
+#endif
+
 #endif // SYMDEF
 

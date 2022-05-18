@@ -14,6 +14,7 @@ struct Cell;
 class QString;
 class QPainter;
 class Selection;
+class QMimeData;
 
 struct UndoItem
 {
@@ -130,6 +131,11 @@ struct Document
     void zoomOutIfNoGrid(QPainter &dc);
     QString sort(bool descending);
     QString layrender(int ds, bool vert, bool toggle = false, bool noset = false);
+    void pasteOrDrop(const QMimeData *dataobjc);
+    bool loadImageIntoCell(const QString &fn, Cell *c, double sc);
+    void setImageBM(Cell *c, const QImage &im, double sc);
+    void pasteSingleText(Cell *c, const QString &t);
+
 
 
     inline void resetCursor() { if (selected.g) selected.setCursorEdit(this, selected.textEdit()); }
@@ -142,6 +148,20 @@ struct Document
     // 定义 Document 内翻译助手
     Q_DECLARE_TR_FUNCTIONS(Document)
 };
+
+
+#define loopcellsin(par, c) \
+    collectCells(par);      \
+    for (int _i = 0; _i < itercells.size(); _i++) \
+        for (Cell *c = itercells[_i]; c; c = nullptr)
+#define loopallcells(c)     \
+    collectCells(rootgrid); \
+    for (int _i = 0; _i < itercells.size(); _i++) \
+        for (Cell *c = itercells[_i]; c; c = nullptr)
+#define loopallcellssel(c, rec) \
+    collectCellsSel(rec);     \
+    for (int _i = 0; _i < itercells.size(); _i++) \
+        for (Cell *c = itercells[_i]; c; c = nullptr)
 
 
 
