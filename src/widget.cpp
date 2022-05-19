@@ -15,6 +15,7 @@
 #include <QScrollBar>
 #include <QLineEdit>
 #include <QMenu>
+#include <QKeyEvent>
 
 Widget::Widget(QScrollArea *scroll) : scrollwin(scroll)
 {
@@ -93,11 +94,6 @@ void Widget::paintEvent(QPaintEvent *e)
     QPainter painter(this);
     painter.setClipRect(e->rect());
     doc->draw(painter);
-}
-
-void Widget::inputMethodEvent(QInputMethodEvent *e)
-{
-    QWidget::inputMethodEvent(e);
 }
 
 void Widget::wheelEvent(QWheelEvent *e)
@@ -208,5 +204,32 @@ void Widget::contextMenuEvent(QContextMenuEvent *e)
     else
     {
         myApp.frame->editmenupopup->exec(e->globalPos());
+    }
+}
+
+void Widget::inputMethodEvent(QInputMethodEvent *e)
+{
+    if (!e->commitString().isEmpty())
+    {
+        doc->key(e->commitString());
+        e->accept();
+    }
+    else
+    {
+        QWidget::inputMethodEvent(e);
+    }
+}
+
+void Widget::keyPressEvent(QKeyEvent *e)
+{
+    auto text = e->text();
+    if (!text.isEmpty())
+    {
+        doc->key(e->text(), e->modifiers());
+        e->accept();
+    }
+    else
+    {
+        QWidget::keyPressEvent(e);
     }
 }

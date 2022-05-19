@@ -37,6 +37,8 @@
 // 滚轮的步长增量
 #define WHEELDELTA 120
 
+// 小图标默认缩放
+#define dd_icon_res_scale 3.0
 
 #ifdef Q_OS_WIN
 #define PATH_SEPERATOR "\\"

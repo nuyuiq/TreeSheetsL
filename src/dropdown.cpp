@@ -2,6 +2,7 @@
 #include "config.h"
 #include "myapp.h"
 #include "tools.h"
+#include "symdef.h"
 
 #include <QDebug>
 #include <QAbstractItemDelegate>
@@ -38,12 +39,7 @@ public:
         }
         else
         {
-            int h = qMin(option.rect.width(), option.rect.height());
             auto img = index.data(Qt::UserRole).value<QPixmap>();
-            if (h != img.size().height())
-            {
-                img = img.scaledToHeight(h);
-            }
             painter->drawPixmap(option.rect.x(), option.rect.y(), img);
         }
     }
@@ -74,9 +70,6 @@ ColorDropdown::ColorDropdown(
     connect(this, &ColorDropdown::customContextMenuRequested, this, [this](){
         emit this->currentIndexChanged(currentIndex());
     });
-//    connect(this, QOverload<int>::of(&ColorDropdown::currentIndexChanged), this, [this](){
-//        qDebug() << this->currentText() << sender();
-//    });
 }
 
 Color ColorDropdown::currentColor() const
@@ -101,10 +94,13 @@ ImageDropdown::ImageDropdown(int sel, int width, int msc, const QString &path, Q
     foreach (const QString &imgfn, ls)
     {
         QPixmap img;
-        if (img.load(path + "/" +imgfn))
+        const auto &p = path + "/" +imgfn;
+        if (img.load(p))
         {
-            // TODO 先缩放还是后缩放?
-            addItem(QString(), img);
+            addItem(p, img.scaled(img.width() / dd_icon_res_scale,
+                                  img.height() / dd_icon_res_scale,
+                                  Qt::IgnoreAspectRatio,
+                                  Qt::SmoothTransformation));
         }
     }
     setCurrentIndex(sel);

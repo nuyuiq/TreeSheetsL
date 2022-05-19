@@ -59,7 +59,10 @@ public:
     void Delete(Selection &s);
     void selectWordBefore(Selection &s);
     void homeEnd(Selection &s, bool home);
-
+    inline void key(Document *doc, const QString &ins, Selection &s)
+    {
+        insert(doc, ins, s);
+    }
 
 
     inline void backspaceWord(Selection &s)

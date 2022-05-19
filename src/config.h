@@ -63,7 +63,7 @@ enum {
     A_SCDOWN,
     A_DEFFONT,
     A_IMPXML,
-    A_IMPXMLA,
+//    A_IMPXMLA,
     A_IMPTXTI,
     A_IMPTXTC,
     A_IMPTXTS,

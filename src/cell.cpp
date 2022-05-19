@@ -430,6 +430,10 @@ QString Cell::toText(int indent, const Selection &s, int format, Document *doc)
             str.prepend(QString::number(celltype));
             str.prepend(" type=\"");
         }
+        if (verticaltextandgrid)
+        {
+            str.prepend(" vertical=\"1\"");
+        }
         str.prepend("<cell");
         str.append(sp);
         str.append("</cell>\n");
@@ -454,7 +458,8 @@ QString Cell::toText(int indent, const Selection &s, int format, Document *doc)
         str.prepend("<li>");
         str.append(sp);
         str.append(QString::fromLatin1("</li>\n"));
-    } else if (format == A_EXPHTMLO && text.t.length())
+    }
+    else if (format == A_EXPHTMLO && text.t.length())
     {
         QString h = QString::fromLatin1("h") + QChar::fromLatin1('0' + (indent / 2)) + QString::fromLatin1(">");
         str.prepend(QString::fromLatin1("<") + h);
@@ -545,6 +550,18 @@ Cell *Cell::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool 
 Cell *Cell::findExact(const QString &s)
 {
     return text.t == s ? this : (grid ? grid->findExact(s) : nullptr);
+}
+
+void Cell::colorChange(int which, uint color)
+{
+    switch (which)
+    {
+    case A_CELLCOLOR: cellcolor = color; break;
+    case A_TEXTCOLOR: textcolor = color; break;
+    case A_BORDCOLOR:
+        if (grid) grid->bordercolor = color;
+        break;
+    }
 }
 
 int Cell::getX(Document *doc) const

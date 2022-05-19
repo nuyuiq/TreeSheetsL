@@ -32,7 +32,14 @@ QVariant Config::read(const QString &key, const QVariant &def) const
 
 void Config::write(const QString &key, const QVariant &value)
 {
-    setting->setValue(key, value);
+    if (value.isNull())
+    {
+        setting->remove(key);
+    }
+    else
+    {
+        setting->setValue(key, value);
+    }
 }
 
 void Config::reset()

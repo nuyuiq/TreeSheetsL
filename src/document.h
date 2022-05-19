@@ -135,7 +135,7 @@ struct Document
     bool loadImageIntoCell(const QString &fn, Cell *c, double sc);
     void setImageBM(Cell *c, const QImage &im, double sc);
     void pasteSingleText(Cell *c, const QString &t);
-
+    QString key(const QString &str, Qt::KeyboardModifiers modifiers=Qt::NoModifier);
 
 
     inline void resetCursor() { if (selected.g) selected.setCursorEdit(this, selected.textEdit()); }

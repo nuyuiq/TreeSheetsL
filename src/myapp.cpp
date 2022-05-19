@@ -142,7 +142,7 @@ static QByteArray uncompressNodeData(const QByteArray &data)
 {
     if (data.isEmpty()) return QByteArray();
     QByteArray tmp = QByteArray(4, Qt::Uninitialized) + data;
-    qToBigEndian<qint32>(data.size() * 4, tmp.data());
+    qToBigEndian<qint32>(data.size() * 8, (uchar*)tmp.data());
     return qUncompress(tmp);
 }
 
@@ -292,7 +292,7 @@ QString MyApp::loadDB(const QString &filename, bool fromreload)
     return QString();
 }
 
-Cell *MyApp::initDB(int sizex, int sizey)
+Cell *&MyApp::initDB(int sizex, int sizey)
 {
     Cell *c = new Cell(nullptr, nullptr, CT_DATA, new Grid(sizex, sizey ? sizey : sizex));
     c->cellcolor = 0xCCDCE2;
@@ -354,58 +354,55 @@ QString MyApp::open(const QString &fn)
     return tr("Open file cancelled.");
 }
 
-static void fillXML(Cell *c, const QDomElement &n, bool attributestoo)
+static void fillXML(Cell *c, const QDomElement &n)
 {
-    // TODO
-    qDebug() << "TODO";
-//    const wxArrayString &as = wxStringTokenize(
-//        n->GetType() == wxXML_ELEMENT_NODE ? n->GetNodeContent() : n->GetContent());
-//    loop(i, as.GetCount()) {
-//        if (c->text.t.Len()) c->text.t.Append(L' ');
-//        c->text.t.Append(as[i]);
-//    }
+    if (n.nodeName() != "cell") return;
+    if (n.hasAttribute("relsize")) c->text.relsize = -n.attribute("relsize").toInt();
+    if (n.hasAttribute("stylebits")) c->text.stylebits = n.attribute("stylebits").toInt();
+    if (n.hasAttribute("colorbg")) c->cellcolor = n.attribute("colorbg").toInt();
+    if (n.hasAttribute("colorfg")) c->textcolor = n.attribute("colorfg").toInt();
+    if (n.hasAttribute("type")) c->celltype = n.attribute("type").toInt();
+    if (n.hasAttribute("vertical")) c->verticaltextandgrid = n.attribute("vertical").toInt();
 
-//    if (n->GetName() == L"cell") {
-//        c->text.relsize = -wxAtoi(n->GetAttribute(L"relsize", L"0"));
-//        c->text.stylebits = wxAtoi(n->GetAttribute(L"stylebits", L"0"));
-//        c->cellcolor = wxAtoi(n->GetAttribute(L"colorbg", L"16777215"));
-//        c->textcolor = wxAtoi(n->GetAttribute(L"colorfg", L"0"));
-//        c->celltype = wxAtoi(n->GetAttribute(L"type", L"0"));
-//    }
+    auto children = n.childNodes();
+    QDomNode grid;
+    for (int i = 0; i < children.size(); i++)
+    {
+        auto child = children.at(i);
+        if (child.nodeType() == QDomNode::TextNode)
+        {
+            if (c->text.t.size()) c->text.t.append(' ');
+            c->text.t += child.nodeValue().trimmed();
+        }
+        else if (child.nodeType() == QDomNode::ElementNode && child.nodeName() == "grid")
+        {
+            grid = child;
+        }
+    }
 
-//    Vector<wxXmlNode *> ns;
-//    Vector<wxXmlAttribute *> ps;
-//    int numrows = GetXMLNodes(n, ns, &ps, attributestoo);
-//    if (!numrows) return;
-
-//    if (ns.size() == 1 && (!c->text.t.Len() || ns[0]->IsWhitespaceOnly()) &&
-//        ns[0]->GetName() != L"row") {
-//        FillXML(c, ns[0], attributestoo);
-//    } else {
-//        bool allrow = n->GetName() == L"grid";
-//        loopv(i, ns) if (ns[i]->GetName() != L"row") allrow = false;
-//        if (allrow) {
-//            int desiredxs;
-//            loopv(i, ns) {
-//                Vector<wxXmlNode *> ins;
-//                int xs = GetXMLNodes(ns[i], ins);
-//                if (!i) {
-//                    desiredxs = xs ? xs : 1;
-//                    c->AddGrid(desiredxs, ns.size());
-//                }
-//                loop(j, desiredxs) if (ins.size() > j)
-//                    FillXML(c->grid->C(j, i), ins[j], attributestoo);
-//                ins.setsize_nd(0);
-//            }
-//        } else {
-//            c->AddGrid(1, numrows);
-//            loopv(i, ps) c->grid->C(0, i)->text.t = ps[i]->GetValue();
-//            loopv(i, ns) FillXML(c->grid->C(0, i + ps.size()), ns[i], attributestoo);
-//        }
-//    }
-
-//    ns.setsize_nd(0);
-//    ps.setsize_nd(0);
+    if (grid.isNull()) return;
+    const auto rows = grid.childNodes();
+    int rownum = rows.size();
+    int colnum = -1;
+    for (int y = 0; y < rownum; y++)
+    {
+        if (rows.at(y).nodeType() != QDomNode::ElementNode || rows.at(y).nodeName() != "row") continue;
+        const auto row = rows.at(y).childNodes();
+        if (colnum == -1)
+        {
+            colnum = row.size();
+            if (colnum == 0) break;
+            c->addGrid(colnum, rownum);
+        }
+        for (int x = 0, e = qMin(colnum, row.size()); x < e; x++)
+        {
+            auto cell = row.at(x);
+            if (cell.nodeType() == QDomNode::ElementNode && cell.nodeName() == "cell")
+            {
+                fillXML(c->grid->C(x, y), cell.toElement());
+            }
+        }
+    }
 }
 
 QString MyApp::import(int k)
@@ -417,14 +414,15 @@ QString MyApp::import(int k)
     {
         switch (k) {
         case A_IMPXML:
-        case A_IMPXMLA: {
+        /*case A_IMPXMLA:*//* 无法理解 OPML 该是什么样的，第三方库的差异，也让人一头雾水，决定暂时放弃该类型 */
+        {
             QDomDocument doc;
             QFile file(fn);
-            if (file.open(QIODevice::ReadOnly)) goto problem;
+            if (!file.open(QIODevice::ReadOnly)) goto problem;
             if (!doc.setContent(&file)) goto problem;
-            Cell *r = initDB(1);
+            Cell *&r = initDB(1);
             Cell *c = *r->grid->cells;
-            fillXML(c, doc.documentElement(), k == A_IMPXMLA);
+            fillXML(c, doc.documentElement());
             if (!c->hasText() && c->grid)
             {
                 *r->grid->cells = nullptr;

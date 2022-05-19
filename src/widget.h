@@ -33,9 +33,9 @@ protected:
     void mouseMoveEvent(QMouseEvent *);
     void mouseDoubleClickEvent(QMouseEvent *);
     void contextMenuEvent(QContextMenuEvent *);
-
+    void keyPressEvent(QKeyEvent *);
 private:
-    QPoint lastmousepos;
+    QPoint lastmousepos;    
 };
 
 

@@ -98,7 +98,7 @@ struct Grid
     void mergeTagCell(Cell *f, Cell *&selcell);
     void mergeTagAll(Cell *into);
     void add(Cell *c);
-
+    void colorChange(Document *doc, int which, uint color, Selection &s);
 
 
 

@@ -9,6 +9,7 @@
 #include "tools.h"
 #include "mainwindow.h"
 #include "widget.h"
+#include "symdef.h"
 
 #include <QDesktopServices>
 #include <QFontDialog>
@@ -42,6 +43,7 @@ void MainWindow::actionActivated()
         }
     };
     int kid = sender()->property("kid").toInt();
+qDebug() << kid;
     switch (kid)
     {
     case A_NOP: break;
@@ -85,6 +87,19 @@ void MainWindow::actionActivated()
             zenmode = !zenmode;
         }
         break;
+    case A_SEARCH:
+    {
+        searchstring = filter->text();
+        Document *doc = getCurTab()->doc;
+        doc->selected.g = nullptr;
+        if (doc->searchfilter)
+        {
+            doc->setSearchFilter(!searchstring.isEmpty());
+        }
+        else doc->refresh();
+        doc->sw->status(QString());
+        break;
+    }
     case A_SEARCHF:
         if (filter)
         {
@@ -104,7 +119,8 @@ void MainWindow::actionActivated()
     {
         Tools::Painter dc(sw);
         sw->doc->shiftToCenter(dc);
-        sw->doc->action(dc, kid); break;  // sw dangling pointer on return
+        sw->doc->action(dc, kid);
+        break;  // sw dangling pointer on return
     }
     default:
         if (kid >= A_FILEHIS0 && kid <= A_FILEHIS0 + 8)
@@ -182,7 +198,7 @@ QString Document::action(QPainter &dc, int k)
     case A_EXPCSV: return Export("csv", "*.csv", tr("Choose CSV file to write"), k);
 
     case A_IMPXML:
-    case A_IMPXMLA:
+//    case A_IMPXMLA:
     case A_IMPTXTI:
     case A_IMPTXTC:
     case A_IMPTXTS:
@@ -452,6 +468,26 @@ QString Document::action(QPainter &dc, int k)
 
     if (!selected.g) return noSel();
 
+    for (;;)
+    {
+        uint color;
+        if (k == A_CELLCOLOR)
+        {
+            color = myApp.cfg->lastcellcolor = myApp.frame->celldd->currentColor().toBGR();
+        }
+        else if (k == A_TEXTCOLOR)
+        {
+            color = myApp.cfg->lasttextcolor = myApp.frame->textdd->currentColor().toBGR();
+        }
+        else if (k == A_BORDCOLOR)
+        {
+            color = myApp.cfg->lastbordcolor = myApp.frame->borddd->currentColor().toBGR();
+        }
+        else break;
+        selected.g->colorChange(this, k, color, selected);
+        RetEmpty;
+    }
+
     Cell *c = selected.getCell();
     switch (k) {
     case A_BACKSPACE:
@@ -704,7 +740,14 @@ QString Document::action(QPainter &dc, int k)
         refresh();
         RetEmpty;
     }
-
+    case A_DDIMAGE:
+        selected.g->cell->addUndo(this);
+        loopallcellssel(c, false)
+        {
+            loadImageIntoCell(myApp.frame->idd->currentText(), c, dd_icon_res_scale);
+        }
+        refresh();
+        RetEmpty;
     case A_SORTD: return sort(true);
     case A_SORT: return sort(false);
 
@@ -819,7 +862,8 @@ QString Document::action(QPainter &dc, int k)
     case A_FOLD:
     case A_FOLDALL:
     case A_UNFOLDALL:
-        loopallcellssel(c, k != A_FOLD) if (c->grid) {
+        loopallcellssel(c, k != A_FOLD) if (c->grid)
+        {
             c->addUndo(this);
             c->grid->folded = k == A_FOLD ? !c->grid->folded : k == A_FOLDALL;
             c->resetChildren();
@@ -1033,6 +1077,8 @@ QString Document::action(QPainter &dc, int k)
         c->text.homeEnd(selected, false);
         drawSelectMove(dc, selected);
         RetEmpty;
-    default: return tr("Internal error: unimplemented operation!");
+    default:
+        qDebug() << "unimplemented operation!" << k;
+        return tr("Internal error: unimplemented operation!");
     }
 }

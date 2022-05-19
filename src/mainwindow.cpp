@@ -303,7 +303,7 @@ void MainWindow::initUI()
     QMenu *impmenu = new QMenu(tr("Import file from"));
     {
         appendSubMenu(impmenu, A_IMPXML, tr("XML..."));
-        appendSubMenu(impmenu, A_IMPXMLA, tr("XML (attributes too, for OPML etc)..."));
+//        appendSubMenu(impmenu, A_IMPXMLA, tr("XML (attributes too, for OPML etc)..."));
         appendSubMenu(impmenu, A_IMPTXTI, tr("Indented text..."));
         appendSubMenu(impmenu, A_IMPTXTC, tr("Comma delimited text (CSV)..."));
         appendSubMenu(impmenu, A_IMPTXTS, tr("Semi-Colon delimited text (CSV)..."));
@@ -760,19 +760,17 @@ void MainWindow::initUI()
 
         tb->addWidget(new QLabel(tr("Search ")));
         tb->addWidget(filter = new QLineEdit);
-        filter->setSizePolicy(QSizePolicy::Policy::Fixed, QSizePolicy::Policy::Fixed);
-        filter->setMinimumWidth(80);
-        filter->setMaximumWidth(80);
+        filter->setFixedWidth(80);
         filter->setProperty("kid", A_SEARCH);
         connect(filter, SIGNAL(returnPressed()), this, SLOT(actionActivated()));
         SEPARATOR;
 
         tb->addWidget(new QLabel(tr("Replace ")));
         tb->addWidget(replaces = new QLineEdit);
-        replaces->setMinimumWidth(60);
-        replaces->setMaximumWidth(60);
+        replaces->setFixedWidth(60);
         replaces->setProperty("kid", A_REPLACE);
-        connect(replaces, SIGNAL(returnPressed()), this, SLOT(actionActivated()));
+        // 目前无事件绑定
+        //connect(replaces, SIGNAL(returnPressed()), this, SLOT(actionActivated()));
         SEPARATOR;
 
         tb->addWidget(new QLabel(tr("Cell ")));

@@ -1097,66 +1097,67 @@ lookformore:
 
 void Grid::CSVImport(const QStringList &as, char sep)
 {
-    // TODO
-    qDebug() << "TODO";
-//    int cy = 0;
-//    for (int y = 0; y < as.size(); y++)
-//    {
-//        QString s = as[y];
-//        QString word;
-//        for (int x = 0; s.at(0); x++)
-//        {
-//            if (s[0] == '\"') {
-//                word.clear();
-//                for (int i = 1;; i++)
-//                {
-//                    if (!s[i])
-//                    {
-//                        if (y < as.size() - 1)
-//                        {
-//                            s = as[++y];
-//                            i = 0;
-//                        }
-//                        else
-//                        {
-//                            s.clear();
-//                            break;
-//                        }
-//                    }
-//                    else if (s[i] == '\"')
-//                    {
-//                        if (s[i + 1] == '\"')
-//                            word += s[++i];
-//                        else
-//                        {
-//                            s = s.size() == i + 1 ? QString() : s.mid(i + 2);
-//                            break;
-//                        }
-//                    }
-//                    else word += s[i];
-//                }
-//            }
-//            else
-//            {
-//                int pos = s.indexOf(sep);
-//                if (pos < 0)
-//                {
-//                    word = s;
-//                    s.clear();
-//                }
-//                else
-//                {
-//                    word = s.left(pos);
-//                    s = s.mid(pos + 1);
-//                }
-//            }
-//            if (x >= xs) insertCells(x, -1, 1, 0);
-//            Cell *c = C(x, cy);
-//            c->text.t = word;
-//        }
-//        cy++;
-//    }
-//    ys = cy;  // throws memory away, but doesn't matter
+    int cy = 0;
+    for (int y = 0; y < as.size(); y++)
+    {
+        QString s = as[y];
+        QString word;
+        for (int x = 0; s.size(); x++)
+        {
+            if (s.at(0).unicode() == '\"')
+            {
+                word.clear();
+                for (int i = 1;; i++)
+                {
+                    if (i >= s.size())
+                    {
+                        if (y < as.size() - 1)
+                        {
+                            s = as.at(++y);
+                            i = 0;
+                        }
+                        else
+                        {
+                            s.clear();
+                            break;
+                        }
+                    }
+                    else if (s.at(i).unicode() == '\"')
+                    {
+                        if (i + 1 < s.size() && s.at(i + 1) == '\"')
+                        {
+                            word += s.at(++i);
+                        }
+                        else
+                        {
+                            s = s.size() == i + 1 ? QString() : s.mid(i + 2);
+                            break;
+                        }
+                    }
+                    else word += s.at(i);
+                }
+            }
+            else
+            {
+                int pos = s.indexOf(sep);
+                if (pos < 0)
+                {
+                    word = s;
+                    s.clear();
+                }
+                else
+                {
+                    word = s.left(pos);
+                    s = s.mid(pos + 1);
+                }
+            }
+            if (x >= xs) insertCells(x, -1, 1, 0);
+            Cell *c = C(x, cy);
+            c->text.t = word;
+        }
+        cy++;
+    }
+    ys = cy;  // throws memory away, but doesn't matter
 }
 
 Cell *Grid::findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch, bool forward)
@@ -1249,6 +1250,14 @@ void Grid::add(Cell *c)
     if (horiz) insertCells(xs, -1, 1, 0, c);
     else insertCells(-1, ys, 0, 1, c);
     c->p = cell;
+}
+
+void Grid::colorChange(Document *doc, int which, uint color, Selection &s)
+{
+    cell->addUndo(doc);
+    cell->resetChildren();
+    foreachcellinsel(c, s) c->colorChange(which, color);
+    doc->refresh();
 }
 
 int Grid::fillRows(Grid *g, const QStringList &as, int column, int startrow, int starty)

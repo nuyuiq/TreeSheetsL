@@ -99,7 +99,7 @@ struct Cell
     Cell *findLink(Selection &s, Cell *link, Cell *best, bool &lastthis, bool &stylematch,
                     bool forward);
     Cell *findExact(const QString &s);
-
+    void colorChange(int which, uint color);
 
     inline bool hasText() const { return !text.t.isEmpty(); }
     inline bool hasTextSize() const { return hasText() || text.relsize; }

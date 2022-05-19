@@ -394,7 +394,6 @@ const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool s
             selected.g->resizeColWidths(dir, selected, hierarchical);
             selected.g->cell->resetLayout();
             selected.g->cell->resetChildren();
-            myApp.frame->updateStatus(selected);
             refresh();
             return dir > 0 ? tr("Column width increased.") : tr("Column width decreased.");
         }
@@ -510,7 +509,7 @@ void Document::refreshHover()
 {
     redrawpending = true;
     myApp.frame->updateStatus(selected);
-    myApp.frame->nb->update();
+    sw->update();
 }
 
 void Document::zoom(int dir, QPainter &dc, bool fromroot, bool selectionmaybedrawroot)
@@ -715,7 +714,7 @@ QString Document::exportFile(const QString &fn, int k, bool currentview)
             return tr("Cannot export grid that is not flat (zoom the view to the desired grid, and/or use Flatten).");
         }
     }
-    if (k == A_EXPIMAGE)
+    else if (k == A_EXPIMAGE)
     {
         maxx = layoutxs;
         maxy = layoutys;
@@ -781,8 +780,12 @@ QString Document::exportFile(const QString &fn, int k, bool currentview)
 
 QString Document::Export(const QString &fmt, const QString &pat, const QString &msg, int k)
 {
-    const QString &fn = Dialog::saveFile(msg, pat, fmt);
+    QString fn = Dialog::saveFile(msg, pat);
     if (fn.isEmpty()) return tr("Export cancelled.");
+    if (!fn.endsWith(fmt))
+    {
+        fn += "." + fmt;
+    }
     return exportFile(fn, k, true);
 }
 
@@ -1096,6 +1099,37 @@ void Document::setImageBM(Cell *c, const QImage &im, double sc)
 void Document::pasteSingleText(Cell *c, const QString &t)
 {
     c->text.insert(this, t, selected);
+}
+
+QString Document::key(const QString &str, Qt::KeyboardModifiers modifiers)
+{
+    if (str.size() == 1 && !str.at(0).isPrint())
+    {
+        int kv = str.at(0).unicode();
+        if (kv == '\b')
+        {
+            Tools::Painter dc(sw);
+            return action(dc, A_BACKSPACE);
+        }
+        if (kv == '\r')
+        {
+            Tools::Painter dc(sw);
+            return action(dc, modifiers & Qt::ShiftModifier ? A_ENTERGRID : A_ENTERCELL);
+        }
+        qDebug() << "unknown key" << kv;
+    }
+    else
+    {
+        if (!selected.g) return noSel();
+        Cell *c;
+        if (!(c = selected.thinExpand(this))) return oneCell();
+        Tools::Painter dc(sw);
+        shiftToCenter(dc);
+        c->addUndo(this); // FIXME: not needed for all keystrokes, or at least, merge all
+        c->text.key(this, str, selected);
+        scrollIfSelectionOutOfView(dc, selected, true);
+    }
+    return QString();
 }
 
 UndoItem::~UndoItem()

@@ -37,6 +37,7 @@ void FileHistory::addFileToHistory(const QString &filename)
         historyfile.removeLast();
     }
     dirty0 = true;
+    refreshMenu();
 }
 
 QString FileHistory::getHistoryFile(int idx)
@@ -73,7 +74,7 @@ void FileHistory::load()
     {
         const auto fn = myApp.cfg->read(fm.arg(i)).toString();
         if (fn.isEmpty()) break;
-        historyfile << fn;
+        if (!historyfile.contains(fn)) historyfile << fn;
     }
     dirty0 = false;
     lastopenfile.clear();
@@ -97,9 +98,9 @@ void FileHistory::save()
         {
             myApp.cfg->write(fm.arg(i + 1), historyfile.at(i));
         }
-        if (historyfile.size() < MAXCOUNT_HISTORY)
+        for (int i = historyfile.size(); i < MAXCOUNT_HISTORY; i++)
         {
-            const auto key = fm.at(historyfile.size() + 1);
+            const auto key = fm.arg(i + 1);
             if (!myApp.cfg->read(key).toString().isEmpty())
             {
                 myApp.cfg->write(key, QVariant());

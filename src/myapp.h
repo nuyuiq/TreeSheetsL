@@ -34,7 +34,7 @@ struct MyApp
     QString loadDB(const QString &filename, bool fromreload);
 
     //! 初始化空文档
-    Cell *initDB(int sizex, int sizey = 0);
+    Cell *&initDB(int sizex, int sizey = 0);
 
     //! 更新全局图片缓存
     ImagePtr wrapImage(const Image &img);
