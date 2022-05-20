@@ -82,7 +82,7 @@ enum {
     A_PRINT,
     A_PREVIEW,
     A_PAGESETUP,
-    A_PRINTSCALE,
+//    A_PRINTSCALE,
     A_EXIT,
     A_NEXT,
     A_PREV,

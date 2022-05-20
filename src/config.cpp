@@ -74,6 +74,7 @@ void Config::reset()
     lastcellcolor = 0xFFFFFF;
     lasttextcolor = 0;
     lastbordcolor = 0xA0A0A0;
+
 }
 
 

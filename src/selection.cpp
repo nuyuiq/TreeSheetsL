@@ -126,7 +126,8 @@ void Selection::dir(Document *doc, bool ctrl, bool shift, QPainter &dc, int dx, 
         x = (x + dx + g->xs) % g->xs;
         y = (y + dy + g->ys) % g->ys;
         if (x + xs > g->xs || y + ys > g->ys) g = nullptr;
-
+        // FIXME: this is null in the case of a whole column selection, and doesn't do the right thing.
+        if (g) g->cell->resetChildren();
         doc->scrollIfSelectionOutOfView(dc, *this, true);
         return;
     }

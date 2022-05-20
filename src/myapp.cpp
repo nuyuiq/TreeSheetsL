@@ -76,7 +76,7 @@ bool MyApp::init()
 {
     QString filename;
     // 是否以便携启动
-    bool portable = false;
+    bool portable = QFile::exists(Tools::resolvePath(QString(), true) + "/" CFG_FILEPATH);
     // 是否单例程序模式的方式启动
     bool single_instance = true;
 
@@ -333,7 +333,7 @@ void MyApp::fileUsed(const QString &filename, Document *doc)
     fhistory->rememberOpenFiles();
     if (cfg->fswatch)
     {
-        QFileInfo fi = QFileInfo(filename);
+        QFileInfo fi(filename);
         doc->lastmodificationtime = fi.lastModified();
         const QString &d = fi.absoluteFilePath();
         frame->fileChangeWatch(d);

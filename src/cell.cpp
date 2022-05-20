@@ -466,7 +466,6 @@ QString Cell::toText(int indent, const Selection &s, int format, Document *doc)
         str.append(sp);
         str.append(QString::fromLatin1("</") + h + QString::fromLatin1("\n"));
     }
-    // TODO
     str.prepend(sp);
     return str;
 }

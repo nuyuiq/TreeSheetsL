@@ -16,15 +16,16 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QKeyEvent>
+#include <QMimeData>
 
 Widget::Widget(QScrollArea *scroll) : scrollwin(scroll)
 {
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_InputMethodEnabled, true);
     setMouseTracking(true);
+    setAcceptDrops(true);
 
     doc = new Document(this);
-    lastrmbwaswithctrl = false;
 
     Q_ASSERT(scroll);
     scroll->setWidget(this);
@@ -147,7 +148,6 @@ void Widget::mousePressEvent(QMouseEvent *e)
     {
         setFocus();
         selectClick(e->x(), e->y(), true, 0);
-        lastrmbwaswithctrl = e->modifiers() & Qt::ControlModifier;
     }
 }
 
@@ -189,7 +189,7 @@ void Widget::mouseDoubleClickEvent(QMouseEvent *e)
 
 void Widget::contextMenuEvent(QContextMenuEvent *e)
 {
-    if (lastrmbwaswithctrl)
+    if (e->modifiers() & Qt::ControlModifier)
     {
         if (doc->tags.isEmpty()) return;
         QMenu tagmenu;
@@ -232,4 +232,28 @@ void Widget::keyPressEvent(QKeyEvent *e)
     {
         QWidget::keyPressEvent(e);
     }
+}
+
+void Widget::dropEvent(QDropEvent *e)
+{
+    const auto pos = e->pos();
+    selectClick(pos.x(), pos.y(), false, 0);
+    doc->pasteOrDrop(e->mimeData());
+}
+
+void Widget::dragEnterEvent(QDragEnterEvent *e)
+{
+    auto d = e->mimeData();
+    bool b = d->hasUrls() || d->hasText() || d->hasImage() || d->hasHtml();
+    if (b) e->accept();
+    else e->ignore();
+}
+
+void Widget::dragMoveEvent(QDragMoveEvent *e)
+{
+    Tools::Painter dc(this);
+    const auto pos = e->pos();
+    updateHover(pos.x(), pos.y(), dc);
+    if (doc->hover.g) e->accept();
+    else e->ignore();
 }

@@ -22,7 +22,6 @@ public:
 
     Document *doc;
     QScrollArea *scrollwin;
-    bool lastrmbwaswithctrl;
 
 protected:
     void paintEvent(QPaintEvent *);
@@ -34,8 +33,12 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *);
     void contextMenuEvent(QContextMenuEvent *);
     void keyPressEvent(QKeyEvent *);
+    void dropEvent(QDropEvent *);
+    void dragEnterEvent(QDragEnterEvent *);
+    void dragMoveEvent(QDragMoveEvent *);
 private:
     QPoint lastmousepos;    
+
 };
 
 

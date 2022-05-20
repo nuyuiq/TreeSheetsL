@@ -15,12 +15,14 @@ class QString;
 class QPainter;
 class Selection;
 class QMimeData;
+class QPrinter;
 
 struct UndoItem
 {
     QVector<Selection> path, selpath;
     Selection sel;
     Cell* clone;
+    uintptr_t cloned_from;  // May be dead.
 
 
     inline UndoItem() : clone(nullptr) { }
@@ -64,7 +66,6 @@ struct Document
     int pathscalebias;
     int isctrlshiftdrag;
     int editfilter;
-    uint printscale;
     bool modified;
     bool tmpsavesuccess;
     bool redrawpending;
@@ -108,7 +109,8 @@ struct Document
     void createPath(Cell *c, QVector<Selection> &path);
     void Blink();
     void drag(QPainter &dc);
-    bool lastUndoSameCell(Cell *c) const;
+    bool LastUndoSameCellTextEdit(Cell *c) const;
+    bool lastUndoSameCellAny(Cell *c);
     QString save(bool saveas, bool *success = nullptr);
     void autoSave(bool minimized, int page);
     QString saveDB(bool *success, bool istempfile = false, int page = -1);
@@ -118,7 +120,7 @@ struct Document
     bool checkForChanges();
     QString action(QPainter &dc, int k);
     QString tagSet(int tagno);
-    void undo(QPainter &dc, QList<UndoItem *> &fromlist, QList<UndoItem *> &tolist, bool redo = false);
+    void undo(QPainter &dc, QList<UndoItem *> &fromlist, QList<UndoItem *> &tolist);
     void scrollOrZoom(QPainter &dc, bool zoomiftiny = false);
     void zoomTiny(QPainter &dc);
     uint pickColor(QWidget *fr, uint defcol);
@@ -136,7 +138,7 @@ struct Document
     void setImageBM(Cell *c, const QImage &im, double sc);
     void pasteSingleText(Cell *c, const QString &t);
     QString key(const QString &str, Qt::KeyboardModifiers modifiers=Qt::NoModifier);
-
+    void print(QPrinter *p);
 
     inline void resetCursor() { if (selected.g) selected.setCursorEdit(this, selected.textEdit()); }
     inline void refreshReset() { refresh(); }

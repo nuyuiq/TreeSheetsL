@@ -26,6 +26,18 @@
 #include <QToolBar>
 #include <QStatusBar>
 #include <QDebug>
+#include <QPageSetupDialog>
+#include <QPrinter>
+#include <QPrintPreviewDialog>
+#include <QPrintDialog>
+
+static void todo()
+{
+    QMessageBox::information(
+                nullptr,
+                "TreeSheets",
+                "Sorry, this feature is not implemented yet.");
+}
 
 void MainWindow::actionActivated()
 {
@@ -43,7 +55,6 @@ void MainWindow::actionActivated()
         }
     };
     int kid = sender()->property("kid").toInt();
-qDebug() << kid;
     switch (kid)
     {
     case A_NOP: break;
@@ -80,7 +91,7 @@ qDebug() << kid;
         {
             if (tb != nullptr) tb->setVisible(zenmode);
             if (sb != nullptr) sb->setVisible(zenmode);
-            this->resize(size()); // TODO
+            this->resize(size());
             this->update();
             if (tb != nullptr) tb->update();
             if (sb != nullptr) sb->update();
@@ -134,13 +145,8 @@ qDebug() << kid;
         }
         else if (kid >= A_SCRIPT && kid < A_MAXACTION)
         {
-            const QString &sf = myApp.cfg->scriptsInMenu.at(kid - A_SCRIPT);
-            // TODO
-            qDebug() << "script run :" << sf;
-            sw->status(QString("scrip run(todo)"));
-//            auto msg = tssi.ScriptRun(sf);
-//            msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
-//            sw->status(wxString(msg));
+            // const QString &sf = myApp.cfg->scriptsInMenu.at(kid - A_SCRIPT);
+            todo();
         }
         else
         {
@@ -158,17 +164,14 @@ QString Document::action(QPainter &dc, int k)
     switch (k)
     {
     case A_RUN:
-        // TODO
-//        myApp.ev.Eval(rootgrid);
-//        rootgrid->resetChildren();
-//        clearSelectionRefresh();
+        todo();
         return tr("Evaluation finished.");
 
     case A_UNDO:
         if (undolist.size())
         {
             undo(dc, undolist, redolist);
-            return QString();
+            RetEmpty;
         }
         else
         {
@@ -178,8 +181,8 @@ QString Document::action(QPainter &dc, int k)
     case A_REDO:
         if (redolist.size())
         {
-            undo(dc, redolist, undolist, true);
-            return nullptr;
+            undo(dc, redolist, undolist);
+            RetEmpty;
         }
         else
         {
@@ -293,44 +296,36 @@ QString Document::action(QPainter &dc, int k)
     }
 
     case A_PRINT: {
-        // TODO
-//        wxPrintDialogData printDialogData(printData);
-//        wxPrinter printer(&printDialogData);
-//        MyPrintout printout(this);
-//        if (printer.Print(sys->frame, &printout, true)) {
-//            printData = printer.GetPrintDialogData().GetPrintData();
-//        }
+        QPrintDialog dialog(myApp.frame->getPrinter(), myApp.frame);
+        if (dialog.exec() == QDialog::Accepted)
+        {
+            print(dialog.printer());
+        }
         RetEmpty;
     }
 
-    case A_PRINTSCALE: {
-        int v = Dialog::intValue(tr("Set Print Scale"),
-                    tr("How many pixels wide should a page be? (0 for auto fit)\nscale:"),
-                    0, 5000, 0);
-        if (v >= 0) printscale = v;
-        RetEmpty;
-    }
+//    case A_PRINTSCALE: {
+//        int v = Dialog::intValue(tr("Set Print Scale"),
+//                    tr("How many pixels wide should a page be? (0 for auto fit)\nscale:"),
+//                    0, 5000, 0);
+//        if (v >= 0) printscale = v;
+//        RetEmpty;
+//    }
 
     case A_PREVIEW: {
-        //TODO
-//        wxPrintDialogData printDialogData(printData);
-//        wxPrintPreview *preview = new wxPrintPreview(
-//                    new MyPrintout(this), new MyPrintout(this), &printDialogData);
-//        wxPreviewFrame *pframe = new wxPreviewFrame(preview, sys->frame, _(L"Print Preview"),
-//                                                    wxPoint(100, 100), wxSize(600, 650));
-//        pframe->Centre(wxBOTH);
-//        pframe->Initialize();
-//        pframe->Show(true);
+        QPrintPreviewDialog dialog(myApp.frame->getPrinter(), myApp.frame);
+        dialog.connect(&dialog, &QPrintPreviewDialog::paintRequested, myApp.frame, [this](QPrinter*p)
+        {
+            print(p);
+        });
+        dialog.setWindowTitle(tr("Print Preview"));
+        dialog.exec();
         RetEmpty;
     }
 
     case A_PAGESETUP: {
-        // TODO
-//        pageSetupData = printData;
-//        wxPageSetupDialog pageSetupDialog(sys->frame, &pageSetupData);
-//        pageSetupDialog.ShowModal();
-//        printData = pageSetupDialog.GetPageSetupDialogData().GetPrintData();
-//        pageSetupData = pageSetupDialog.GetPageSetupDialogData();
+        QPageSetupDialog dialog(myApp.frame->getPrinter(), myApp.frame);
+        dialog.exec();
         RetEmpty;
     }
 
@@ -571,7 +566,7 @@ QString Document::action(QPainter &dc, int k)
             {
                 s = selected.g->convertToText(selected, 0, A_EXPTEXT, this);
             }
-            myApp.frame->clipboardcopy = s; // TODO
+            myApp.frame->clipboardcopy = s;
             clipboard->setText(s);
         }
 
@@ -645,27 +640,30 @@ QString Document::action(QPainter &dc, int k)
     case A_MARKVIEWH:
     case A_MARKVIEWV:
     case A_MARKCODE: {
-        // TODO
-//        int newcelltype;
-//        switch (k) {
-//        case A_MARKDATA: newcelltype = CT_DATA; break;
-//        case A_MARKVARD: newcelltype = CT_VARD; break;
-//        case A_MARKVARU: newcelltype = CT_VARU; break;
-//        case A_MARKVIEWH: newcelltype = CT_VIEWH; break;
-//        case A_MARKVIEWV: newcelltype = CT_VIEWV; break;
-//        case A_MARKCODE: newcelltype = CT_CODE; break;
-//        }
-//        selected.g->cell->addUndo(this);
-//        loopallcellssel(c, false) {
-//            c->celltype =
-//                    (newcelltype == CT_CODE) ? sys->ev.InferCellType(c->text) : newcelltype;
-//            refresh();
-//        }
+        int newcelltype;
+        switch (k) {
+        case A_MARKDATA: newcelltype = CT_DATA; break;
+        case A_MARKVARD: newcelltype = CT_VARD; break;
+        case A_MARKVARU: newcelltype = CT_VARU; break;
+        case A_MARKVIEWH: newcelltype = CT_VIEWH; break;
+        case A_MARKVIEWV: newcelltype = CT_VIEWV; break;
+        case A_MARKCODE: newcelltype = CT_CODE; break;
+        }
+        selected.g->cell->addUndo(this);
+        loopallcellssel(c, false)
+        {
+            c->celltype = newcelltype;
+            if (newcelltype == CT_CODE)
+            {
+                qDebug() << "Need to check the legitimacy of the symbol";
+            }
+            refresh();
+        }
         RetEmpty;
     }
 
     case A_CANCELEDIT:
-        if (selected.textEdit()) break; // TODO break?
+        if (selected.textEdit()) break;
         if (selected.g->cell->p)
         {
             selected = selected.g->cell->p->grid->findCell(selected.g->cell);
@@ -728,7 +726,7 @@ QString Document::action(QPainter &dc, int k)
                     tr("Please select an image file:"),
                     QString::fromLatin1("*.* (*.*)"));
         c->addUndo(this);
-        loadImageIntoCell(fn, c, 1); // TODO sys->frame->csf
+        loadImageIntoCell(fn, c, 1);
         refresh();
         RetEmpty;
     }
@@ -882,7 +880,7 @@ QString Document::action(QPainter &dc, int k)
     case A_IMAGESCN: {
         loopallcellssel(c, true) if (c->text.image)
         {
-                c->text.image->resetScale(1); // TODO sys->frame->csf
+                c->text.image->resetScale(1);
         }
         selected.g->cell->resetChildren();
         refresh();
@@ -955,7 +953,7 @@ QString Document::action(QPainter &dc, int k)
         {
             fn.setFile(QFileInfo(filename).absolutePath() + "/" + f);
         }
-        if (!QProcess::startDetached(fn.absoluteFilePath()))
+        if (!QDesktopServices::openUrl(fn.absoluteFilePath()))
         {
             return tr("Cannot find file.");
         }
@@ -1031,7 +1029,7 @@ QString Document::action(QPainter &dc, int k)
 
     switch (k) {
     case A_CANCELEDIT:
-        if (lastUndoSameCell(c)) undo(dc, undolist, redolist);
+        if (LastUndoSameCellTextEdit(c)) undo(dc, undolist, redolist);
         else refresh();
         selected.exitEdit(this);
         RetEmpty;

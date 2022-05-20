@@ -24,12 +24,15 @@
 #include <QDesktopWidget>
 #include <QFileSystemWatcher>
 #include <QCloseEvent>
+#include <QMessageBox>
+#include <QPrinter>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
     myApp.frame = this;
     fromclosebox = true;
     zenmode = false;
+    printer = nullptr;
     initUI();
     watcher = new QFileSystemWatcher(this);
     connect(watcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::fileChanged);
@@ -40,6 +43,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
+    DELPTR(printer);
     if (savechecker) killTimer(savechecker);
     if (blinkTimer) killTimer(blinkTimer);
 }
@@ -67,8 +71,58 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 
 void MainWindow::fileChanged(const QString &path)
 {
-    // TODO
-    qDebug() << path;
+     for (int i = 0; i < nb->count(); i++)
+     {
+         Document *doc = getTabByIndex(i)->doc;
+         if (path == doc->filename)
+         {
+             QFileInfo fi(path);
+             QDateTime modtime = fi.lastModified();
+             // Compare with last modified to trigger multiple times.
+             if (!modtime.isValid() ||
+                 !doc->lastmodificationtime.isValid() ||
+                 modtime == doc->lastmodificationtime)
+             {
+                 return;
+             }
+             if (doc->modified)
+             {
+                 const QString &msg =
+                         tr("%1\nhas been modified on disk by another program / computer:\nWould "
+                            "you like to discard "
+                            "your changes and re-load from disk?")
+                         .arg(doc->filename);
+                 int res = QMessageBox::question(
+                             this,
+                             tr("File modification conflict!"),
+                             msg);
+                 if (res != QMessageBox::Yes) return;
+             }
+             auto msg = myApp.loadDB(doc->filename, true);
+             if (!msg.isEmpty())
+             {
+                 getCurTab()->status(msg);
+             }
+             else
+             {
+                 for (int j = 0; j < nb->count(); j++)
+                 {
+                     if (getTabByIndex(j)->doc == doc)
+                     {
+                         nb->removeTab(j);
+                         doc->sw->scrollwin->deleteLater();
+                         break;
+                     }
+                 }
+                 QFile(Tools::tmpName(path)).remove();
+                 fileChangeWatch(path);
+                 getCurTab()->status(
+                             tr("File has been re-loaded because of "
+                                "modifications of another program / computer"));
+             }
+             return;
+         }
+     }
 }
 
 void MainWindow::tabClose(int idx)
@@ -144,14 +198,11 @@ void MainWindow::updateStatus(const Selection &s)
 
 void MainWindow::deIconize()
 {
-    if (!isHidden())
+    if (isHidden())
     {
-        // TODO
-        // RequestUserAttention();
-        return;
+        show();
+        trayIcon->hide();
     }
-    show();
-    trayIcon->hide();
 }
 
 void MainWindow::tabsReset()
@@ -167,6 +218,25 @@ void MainWindow::cycleTabs(int offset)
     auto numtabs = nb->count();
     offset = ((offset >= 0) ? 1 : numtabs - 1);  // normalize to non-negative wrt modulo
     nb->setCurrentIndex((nb->currentIndex() + offset) % numtabs);
+}
+
+QPrinter *MainWindow::getPrinter()
+{
+    if (printer == nullptr)
+    {
+        printer = new QPrinter;
+        auto mg = printer->margins();
+        if (
+                mg.top == 0 &&
+                mg.left == 0 &&
+                mg.right == 0 &&
+                mg.bottom == 0)
+        {
+            mg.top = mg.left = mg.right = mg.bottom = 6;
+            printer->setMargins(mg);
+        }
+    }
+    return printer;
 }
 
 void MainWindow::fileChangeWatch(const QString &file)
@@ -323,7 +393,7 @@ void MainWindow::initUI()
         appendSubMenu(filemenu, A_SAVEAS, tr("Save &As..."));
         filemenu->addSeparator();
         appendSubMenu(filemenu, A_PAGESETUP, tr("Page Setup..."));
-        appendSubMenu(filemenu, A_PRINTSCALE, tr("Set Print Scale..."));
+        //appendSubMenu(filemenu, A_PRINTSCALE, tr("Set Print Scale..."));
         appendSubMenu(filemenu, A_PREVIEW, tr("Print preview..."));
         appendSubMenu(filemenu, A_PRINT, tr("&Print...\tCTRL+p"));
         filemenu->addSeparator();
@@ -728,7 +798,6 @@ void MainWindow::initUI()
         auto sz = iconset ? QSize(TOOL_SIZE0, TOOL_SIZE0) : QSize(TOOL_SIZE1, TOOL_SIZE1);
         tb->setIconSize(sz);
 
-        //double sc = iconset ? 1.0 : 22.0 / 48.0;
 #ifdef Q_OS_MAC
 #define SEPARATOR
 #else

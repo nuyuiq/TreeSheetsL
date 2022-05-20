@@ -613,6 +613,15 @@ void Grid::relSize(int dir, Selection &s, int zoomdepth)
 void Grid::multiCellDeleteSub(Document *doc, Selection &s)
 {
     foreachcellinsel(c, s) c->clear();
+    forever
+    {
+        int qd = (s.xs == xs) + ((s.ys == ys) << 1);
+             if (qd == 3) delSelf(doc, s);
+        else if (qd == 2) delLine(s, false);
+        else if (qd == 1) delLine(s, true);
+        else break;
+        return;
+    }
     bool delhoriz = true, delvert = true;
     foreachcell(c)
     {
@@ -624,29 +633,13 @@ void Grid::multiCellDeleteSub(Document *doc, Selection &s)
     }
     if (delhoriz && (!delvert || s.xs >= s.ys))
     {
-        if (s.ys == ys)
-        {
-            delSelf(doc, s);
-        }
-        else
-        {
-            for (int i = 0; i < s.ys; i++) deleteCells(-1, s.y, 0, -1);
-            s.ys = 0;
-            s.xs = 1;
-        }
+        if (s.ys == ys) delSelf(doc, s);
+        else delLine(s, true);
     }
     else if (delvert)
     {
-        if (s.xs == xs)
-        {
-            delSelf(doc, s);
-        }
-        else
-        {
-            for (int i = 0; i < s.xs; i++) deleteCells(s.x, -1, -1, 0);
-            s.xs = 0;
-            s.ys = 1;
-        }
+        if (s.xs == xs) delSelf(doc, s);
+        else delLine(s, false);
     }
     else
     {
@@ -655,10 +648,30 @@ void Grid::multiCellDeleteSub(Document *doc, Selection &s)
     }
 }
 
+void Grid::delLine(Selection &s, bool horiz)
+{
+    if (horiz)
+    {
+        for (int i = 0; i < s.ys; i++) deleteCells(-1, s.y, 0, -1);
+        s.ys = 0;
+        s.xs = 1;
+    }
+    else
+    {
+        for (int i = 0; i < s.xs; i++) deleteCells(s.x, -1, -1, 0);
+        s.xs = 0;
+        s.ys = 1;
+    }
+}
+
 void Grid::delSelf(Document *doc, Selection &s)
 {
-    for (auto c = doc->curdrawroot; c; c = c->p)
-        if (c == cell) return;  // FIXME, if drawroot, auto zoom out instead (needs dc)
+    if (!doc->drawpath.isEmpty() && doc->drawpath.last().g == this)
+    {
+        doc->drawpath.pop_back();
+        doc->curdrawroot = doc->walkPath(doc->drawpath);
+    }
+    if (!cell->p) return;  // FIXME: deletion of root cell, what would be better?
     s = cell->p->grid->findCell(cell);
     Grid *&pthis = cell->grid;
     DELPTR(pthis);
@@ -885,7 +898,6 @@ void Grid::setStyle(Document *doc, Selection &s, int sb)
 {
     cell->addUndo(doc);
     cell->resetChildren();
-    // TODO
     foreachcellinsel(c, s) c->text.stylebits ^= sb;
     doc->refresh();
 }

@@ -19,6 +19,7 @@
 #include <QColorDialog>
 #include <QMimeData>
 #include <QUrl>
+#include <Qprinter>
 
 
 Document::Document(Widget *sw)
@@ -36,7 +37,6 @@ Document::Document(Widget *sw)
     isctrlshiftdrag = 0;
     blink = true;
     tmpsavesuccess = true;
-    printscale = 0;
     editfilter = 0;
     searchfilter = false;
     lastsave = QDateTime::currentMSecsSinceEpoch() / 1000;
@@ -64,7 +64,6 @@ void Document::clearSelectionRefresh()
 
 bool Document::scrollIfSelectionOutOfView(QPainter &dc, Selection &s, bool refreshalways)
 {
-    // TODO
     if (!scaledviewingmode)
     {
         // required, since sizes of things may have been reset by the last editing operation
@@ -180,10 +179,9 @@ void Document::draw(QPainter &dc)
     else
     {
         const auto &o = QRect(originx, originy, maxx - originx, maxy - originy);
-        const auto &tf = QTransform()  // TODO 顺序
+        const auto &tf = QTransform()
                 .scale(1/currentviewscale, 1/currentviewscale)
-                .translate(-centerx, -centery)
-                ;
+                .translate(-centerx, -centery);
         const auto &n = o & tf.mapRect(roi);
         n.getCoords(&originx, &originy, &maxx, &maxy);
     }
@@ -289,11 +287,12 @@ void Document::addUndo(Cell *c)
         modified = true;
         updateFileName();
     }
-    if (lastUndoSameCell(c)) return;
+    if (LastUndoSameCellTextEdit(c)) return;
     UndoItem *ui = new UndoItem();
     undolist.append(ui);
     ui->clone = c->clone(nullptr);
     ui->sel = selected;
+    ui->cloned_from = (uintptr_t)c;
     createPath(c, ui->path);
     if (selected.g) createPath(selected.g->cell, ui->selpath);
     size_t old_list_size = undolist.size();
@@ -389,8 +388,7 @@ const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool s
         if (!selected.g) return noSel();
         if (selected.xs > 0)
         {
-            // FIXME: should do undo, but this is a lot of undos that need to coalesced, same
-            // for relsize
+            if (!lastUndoSameCellAny(selected.g->cell)) selected.g->cell->addUndo(this);
             selected.g->resizeColWidths(dir, selected, hierarchical);
             selected.g->cell->resetLayout();
             selected.g->cell->resetChildren();
@@ -412,7 +410,7 @@ const QString Document::wheel(QPainter &dc, int dir, bool alt, bool ctrl, bool s
     else if (ctrl)
     {
         int steps = qAbs(dir);
-        dir = dir > 0? 1: -1; // TODO
+        dir = dir > 0? 1: -1;
         for (int i = 0; i < steps; i++) zoom(dir, dc);
         return dir > 0 ? tr("Zoomed in.") : tr("Zoomed out.");
     }
@@ -593,16 +591,21 @@ void Document::drag(QPainter &dc)
         }
     }
     resetCursor();
-    return;
 }
 
-bool Document::lastUndoSameCell(Cell *c) const
+bool Document::LastUndoSameCellTextEdit(Cell *c) const
 {
     // hacky way to detect word boundaries to stop coalescing, but works, and
     // not a big deal if selected is not actually related to this cell
     return undolist.size() && !c->grid && undolist.size() != undolistsizeatfullsave &&
             undolist.last()->sel.eqLoc(c->p->grid->findCell(c)) &&
             (!c->text.t.endsWith(QChar::fromLatin1(' ')) || c->text.t.length() != selected.cursor);
+}
+
+bool Document::lastUndoSameCellAny(Cell *c)
+{
+    return undolist.size() && undolist.size() != undolistsizeatfullsave &&
+            undolist.last()->cloned_from == (uintptr_t)c;
 }
 
 QString Document::save(bool saveas, bool *success)
@@ -623,7 +626,7 @@ QString Document::save(bool saveas, bool *success)
 
 void Document::autoSave(bool minimized, int page)
 {
-    if (tmpsavesuccess && !filename.isEmpty() && lastmodsinceautosave)
+    if (myApp.cfg->autosave && tmpsavesuccess && !filename.isEmpty() && lastmodsinceautosave)
     {
         auto lt = QDateTime::currentMSecsSinceEpoch() / 1000;
         if (lastmodsinceautosave + 60 < lt || lastsave + 300 < lt || minimized)
@@ -818,8 +821,6 @@ bool Document::checkForChanges()
     return true;
 }
 
-
-
 QString Document::tagSet(int tagno)
 {
     Q_ASSERT(tagno >= 0 && tagno < tags.size());
@@ -832,9 +833,8 @@ QString Document::tagSet(int tagno)
     return QString();
 }
 
-void Document::undo(QPainter &dc, QList<UndoItem *> &fromlist, QList<UndoItem *> &tolist, bool redo)
+void Document::undo(QPainter &dc, QList<UndoItem *> &fromlist, QList<UndoItem *> &tolist)
 {
-    Q_UNUSED(redo) // TODO
     Selection beforesel = selected;
     QVector<Selection> beforepath;
     if (beforesel.g) createPath(beforesel.g->cell, beforepath);
@@ -899,9 +899,8 @@ void Document::zoomTiny(QPainter &dc)
     Cell *c = selected.getCell();
     if (c && c->tiny)
     {
-        int rels = c->text.relsize;
-        while (fontIsMini(textSize(c->depth(), rels))) rels--;
-        zoom(c->text.relsize - rels, dc);  // seems to leave selection box in a weird location?
+        zoom(1, dc);  // seems to leave selection box in a weird location?
+        if (selected.getCell() != c) zoomTiny(dc);
     }
 }
 
@@ -1021,29 +1020,30 @@ void Document::pasteOrDrop(const QMimeData *dataobjc)
             sw->status(tr("Cannot drag & drop more than 1 file."));
         }
         c->addUndo(this);
-        auto fn = us.at(0).toString();
-        if (!loadImageIntoCell(fn, c, 1)) // TODO sys->frame->csf
+        auto fn = us.at(0);
+        auto txt = fn.isLocalFile()? fn.toLocalFile(): fn.toString();
+        if (!loadImageIntoCell(txt, c, 1))
         {
-            pasteSingleText(c, fn);
+            pasteSingleText(c, txt);
         }
         refresh();
     }
-    if (dataobjc->hasImage())
+    else if (dataobjc->hasImage())
     {
         const QPixmap &im = qvariant_cast<QPixmap>(dataobjc->imageData());
         c->addUndo(this);
-        setImageBM(c, im.toImage(), 1);  // TODO sys->frame->csf
+        setImageBM(c, im.toImage(), 1);
         c->reset();
         refresh();
     }
-    if (dataobjc->hasHtml())
+    else if (dataobjc->hasHtml())
     {
         // TODO
         // Would have to somehow parse HTML here to get images and styled text.
         // Would have to somehow parse RTF here to get images and styled text.
     }
     // several text formats
-    if (dataobjc->hasText())
+    else if (dataobjc->hasText())
     {
         const QString s = dataobjc->text();
         if (!s.isEmpty())
@@ -1130,6 +1130,26 @@ QString Document::key(const QString &str, Qt::KeyboardModifiers modifiers)
         scrollIfSelectionOutOfView(dc, selected, true);
     }
     return QString();
+}
+
+void Document::print(QPrinter *p)
+{
+    QPainter dc(p);
+    layout(dc);
+    maxx = layoutxs;
+    maxy = layoutys;
+    originx = originy = 0;
+    auto psize = p->pageRect().size();
+    auto dsize = QSize(maxx, maxy);
+    qreal ds = qMin((qreal)psize.width() / dsize.width(), (qreal)psize.height() / dsize.height());
+    dc.scale(ds, ds);
+    if (!qFuzzyIsNull(ds)) psize /= ds;
+    auto offs = (psize - dsize) / 2;
+    dc.translate(offs.width(), offs.height());
+    dc.setClipRect(QRect(QPoint(0, 0), dsize));
+    while_printing = true;
+    render(dc);
+    while_printing = false;
 }
 
 UndoItem::~UndoItem()

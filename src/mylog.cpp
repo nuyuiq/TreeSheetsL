@@ -8,6 +8,7 @@ static QtMessageHandler oldHandler;
 static void msgOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     // todo
+    // 可以自定义输出到指定的地方
     //const QString &output = qFormatLogMessage(type, context, msg);
 
     if (Q_LIKELY(oldHandler)) oldHandler(type, context, msg);

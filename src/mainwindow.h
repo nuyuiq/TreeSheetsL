@@ -16,6 +16,7 @@ class QFileSystemWatcher;
 class QLabel;
 class Selection;
 class Cell;
+class QPrinter;
 
 class MainWindow : public QMainWindow
 {
@@ -49,6 +50,7 @@ public:
     void deIconize();
     void tabsReset();
     void cycleTabs(int offset = 1);
+    QPrinter *getPrinter();
 
 
     ImagePtr foldicon;
@@ -64,6 +66,7 @@ public:
     QStatusBar *sb;
     ColorDropdown *celldd, *textdd, *borddd;
     ImageDropdown *idd;
+    QPrinter *printer;
     QScopedPointer<Cell> cellclipboard;
     QString searchstring;
     QString clipboardcopy;

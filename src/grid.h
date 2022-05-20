@@ -58,6 +58,7 @@ struct Grid
     void relSize(int dir, int zoomdepth);
     void relSize(int dir, Selection &s, int zoomdepth);
     void multiCellDeleteSub(Document *doc, Selection &s);
+    void delLine(Selection &s, bool horiz);
     void delSelf(Document *doc, Selection &s);
     void deleteCells(int dx, int dy, int nxs, int nys);
     //! Clones g into this grid. This mutates the grid this function is called on.
@@ -108,7 +109,8 @@ struct Grid
         Q_UNUSED(s)
         return convertToText(selectAll(), indent + 2, format, doc);
     }
-    inline void cloneStyleFrom(Grid *o) {
+    inline void cloneStyleFrom(Grid *o)
+    {
         bordercolor = o->bordercolor;
         // TODO: what others?
     }
